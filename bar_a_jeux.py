@@ -9,6 +9,7 @@ from datetime import datetime
 import os
 import chardet
 import subprocess
+import json
 
 # Page config
 st.set_page_config(page_title="Echec et Map", page_icon="🎮", layout="wide")
@@ -31,7 +32,50 @@ st.markdown("""
     .bar-box {background: #E6F3FF; padding: 10px; border-radius: 8px; margin: 5px 0; cursor: pointer; border: 1px solid #1E90FF;}
     .bar-box:hover {background: #D0E8FF;}
     .game-item {padding: 5px; margin: 3px 0;}
-    .reaction-btn {font-size: 20px; cursor: pointer; margin: 0 5px;}
+    
+    /* Horizontal reactions on mobile */
+    .reaction-container {
+        display: flex;
+        flex-direction: row;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 5px;
+    }
+    .reaction-btn {
+        background: none;
+        border: 1px solid #ddd;
+        border-radius: 15px;
+        padding: 2px 8px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .reaction-btn:hover {background-color: #f0f0f0;}
+    
+    /* Comment styling */
+    .comment-box {
+        background-color: #f8f9fa;
+        border-left: 3px solid #1E90FF;
+        padding: 8px 12px;
+        margin: 5px 0;
+        border-radius: 0 8px 8px 0;
+    }
+    .comment-header {
+        font-size: 0.9em;
+        color: #666;
+        margin-bottom: 4px;
+        display: flex;
+        justify-content: space-between;
+    }
+    .comment-author {
+        font-weight: bold;
+        color: #003366;
+    }
+    .comment-text {
+        color: #333;
+    }
+    
+    .admin-btn {position: fixed; top: 70px; right: 20px; z-index: 999;}
+    .admin-btn button {font-size: 16px !important; padding: 5px 10px !important;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -46,8 +90,6 @@ if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
 if 'show_admin_panel' not in st.session_state:
     st.session_state.show_admin_panel = False
-if 'selected_map_bar' not in st.session_state:
-    st.session_state.selected_map_bar = None
 if 'show_games' not in st.session_state:
     st.session_state.show_games = {}
 
@@ -79,7 +121,6 @@ def auto_commit_csv():
                                   capture_output=True, 
                                   text=True)
         if result_add.returncode != 0:
-            st.error(f"Git Add Error: {result_add.stderr}")
             print(f"Git Add Error: {result_add.stderr}")
             
         # Commit changes
@@ -88,19 +129,10 @@ def auto_commit_csv():
                                      capture_output=True, 
                                      text=True)
         
-        if result_commit.returncode != 0:
-            # Ignore "nothing to commit" errors
-            if "nothing to commit" not in result_commit.stdout:
-                st.error(f"Git Commit Error: {result_commit.stderr}")
-                print(f"Git Commit Error: {result_commit.stderr}")
-            else:
-                print("Nothing to commit")
-        else:
+        if result_commit.returncode == 0:
             st.toast("✅ Sauvegardé et commité !", icon="💾")
-            print("Auto-commit successful")
             
     except Exception as e:
-        st.error(f"Auto-commit failed: {str(e)}")
         print(f"Auto-commit exception: {str(e)}")
 
 @st.cache_data
@@ -157,12 +189,16 @@ def save_forum_comment(post):
         else:
             df = pd.DataFrame(columns=['username', 'bar', 'game', 'when', 'message', 'timestamp', 'reported', 'report_reason', 'reactions', 'comments'])
         
+        # Ensure comments are stored as JSON string
+        if 'comments' in post and isinstance(post['comments'], list):
+            post['comments'] = json.dumps(post['comments'])
+            
         new_row = pd.DataFrame([post])
         df = pd.concat([df, new_row], ignore_index=True)
         df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
         auto_commit_csv()
-    except:
-        pass
+    except Exception as e:
+        st.error(f"Erreur sauvegarde: {e}")
 
 def load_game_requests():
     if os.path.exists(GAME_REQUESTS_CSV_PATH):
@@ -207,6 +243,10 @@ def delete_forum_post(index):
     st.session_state.forum_posts.pop(index)
     try:
         df = pd.DataFrame(st.session_state.forum_posts)
+        # Ensure comments are serialized
+        for i in range(len(df)):
+            if 'comments' in df.iloc[i] and isinstance(df.iloc[i]['comments'], list):
+                df.at[i, 'comments'] = json.dumps(df.iloc[i]['comments'])
         df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
         auto_commit_csv()
     except:
@@ -217,6 +257,10 @@ def report_forum_post(index, reason):
     st.session_state.forum_posts[index]['report_reason'] = reason
     try:
         df = pd.DataFrame(st.session_state.forum_posts)
+        # Ensure comments are serialized
+        for i in range(len(df)):
+            if 'comments' in df.iloc[i] and isinstance(df.iloc[i]['comments'], list):
+                df.at[i, 'comments'] = json.dumps(df.iloc[i]['comments'])
         df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
         auto_commit_csv()
     except:
@@ -226,29 +270,93 @@ def add_reaction(index, emoji):
     if 'reactions' not in st.session_state.forum_posts[index] or pd.isna(st.session_state.forum_posts[index]['reactions']):
         st.session_state.forum_posts[index]['reactions'] = emoji
     else:
-        st.session_state.forum_posts[index]['reactions'] += f",{emoji}"
+        # Check if already reacted to avoid duplicates if desired, or just append
+        current = st.session_state.forum_posts[index]['reactions']
+        if emoji not in current: # Simple toggle logic could be added here
+            st.session_state.forum_posts[index]['reactions'] += f",{emoji}"
     try:
         df = pd.DataFrame(st.session_state.forum_posts)
+        # Ensure comments are serialized
+        for i in range(len(df)):
+            if 'comments' in df.iloc[i] and isinstance(df.iloc[i]['comments'], list):
+                df.at[i, 'comments'] = json.dumps(df.iloc[i]['comments'])
         df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
         auto_commit_csv()
     except:
         pass
 
-def add_comment_to_post(index, comment):
+def add_comment_to_post(index, author, text):
+    # Initialize comments list if needed
     if 'comments' not in st.session_state.forum_posts[index] or pd.isna(st.session_state.forum_posts[index]['comments']):
-        st.session_state.forum_posts[index]['comments'] = comment
-    else:
-        st.session_state.forum_posts[index]['comments'] += f"|||{comment}"
+        st.session_state.forum_posts[index]['comments'] = []
+    elif isinstance(st.session_state.forum_posts[index]['comments'], str):
+        # Handle legacy string format or JSON string
+        try:
+            st.session_state.forum_posts[index]['comments'] = json.loads(st.session_state.forum_posts[index]['comments'])
+        except:
+            # Legacy ||| format
+            legacy = st.session_state.forum_posts[index]['comments'].split('|||')
+            st.session_state.forum_posts[index]['comments'] = [{'author': 'Anonyme', 'text': c, 'timestamp': ''} for c in legacy if c]
+
+    # Add new comment
+    new_comment = {
+        'author': author,
+        'text': text,
+        'timestamp': datetime.now().strftime("%d/%m %H:%M"),
+        'reactions': ''
+    }
+    st.session_state.forum_posts[index]['comments'].append(new_comment)
+    
     try:
         df = pd.DataFrame(st.session_state.forum_posts)
+        # Serialize comments to JSON for CSV storage
+        for i in range(len(df)):
+            if 'comments' in df.iloc[i] and isinstance(df.iloc[i]['comments'], list):
+                df.at[i, 'comments'] = json.dumps(df.iloc[i]['comments'])
+        
         df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
         auto_commit_csv()
+    except Exception as e:
+        st.error(f"Erreur ajout commentaire: {e}")
+
+def delete_comment(post_index, comment_index):
+    try:
+        # Ensure comments are loaded as list
+        comments = st.session_state.forum_posts[post_index]['comments']
+        if isinstance(comments, str):
+            try:
+                comments = json.loads(comments)
+            except:
+                comments = []
+        
+        if 0 <= comment_index < len(comments):
+            comments.pop(comment_index)
+            st.session_state.forum_posts[post_index]['comments'] = comments
+            
+            df = pd.DataFrame(st.session_state.forum_posts)
+            for i in range(len(df)):
+                if 'comments' in df.iloc[i] and isinstance(df.iloc[i]['comments'], list):
+                    df.at[i, 'comments'] = json.dumps(df.iloc[i]['comments'])
+            df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
+            auto_commit_csv()
     except:
         pass
 
 # Load data
 if len(st.session_state.forum_posts) == 0:
     st.session_state.forum_posts = load_forum_comments()
+    # Parse JSON comments on load
+    for post in st.session_state.forum_posts:
+        if 'comments' in post and isinstance(post['comments'], str):
+            try:
+                post['comments'] = json.loads(post['comments'])
+            except:
+                # Handle legacy
+                if '|||' in post['comments']:
+                    legacy = post['comments'].split('|||')
+                    post['comments'] = [{'author': 'Anonyme', 'text': c, 'timestamp': ''} for c in legacy if c]
+                else:
+                    post['comments'] = []
 
 if st.session_state.games_data.empty:
     st.session_state.games_data = load_games_from_csv()
@@ -256,20 +364,26 @@ if st.session_state.games_data.empty:
 if len(st.session_state.game_requests) == 0:
     st.session_state.game_requests = load_game_requests()
 
-# Admin button
+# Discreet Admin Button (small emoji)
+st.markdown("""<style>
+.admin-btn {position: fixed; top: 70px; right: 20px; z-index: 999;}
+.admin-btn button {font-size: 16px !important; padding: 5px 10px !important;}
+</style>""", unsafe_allow_html=True)
+
 col_header1, col_header2 = st.columns([20, 1])
 with col_header2:
     if st.button("🔧"):
         st.session_state.show_admin_panel = not st.session_state.show_admin_panel
 
+# Admin Panel
 if st.session_state.show_admin_panel:
     st.markdown("---")
-    st.markdown("### 🔐 Accès Admin")
+    st.markdown("### 🔐 Accès Administrateur")
     if not st.session_state.admin_logged_in:
-        admin_pw = st.text_input("Mot de passe:", type="password", key="admin_pw")
+        admin_pw = st.text_input("Mot de passe:", type="password", key="admin_login")
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("Connexion"):
+            if st.button("Se connecter"):
                 if admin_pw == "admin123":
                     st.session_state.admin_logged_in = True
                     st.rerun()
@@ -281,7 +395,7 @@ if st.session_state.show_admin_panel:
                 st.rerun()
     else:
         st.success("✅ Connecté")
-        if st.button("Déconnexion"):
+        if st.button("Se déconnecter"):
             st.session_state.admin_logged_in = False
             st.session_state.show_admin_panel = False
             st.rerun()
@@ -476,7 +590,7 @@ try:
                         'reported': False,
                         'report_reason': '',
                         'reactions': '',
-                        'comments': ''
+                        'comments': [] # Initialize as empty list
                     }
                     st.session_state.forum_posts.insert(0, post)
                     save_forum_comment(post)
@@ -501,47 +615,81 @@ try:
                         st.markdown(f"🕐 {post['when']}")
                     st.markdown(f"{post['message']}")
                     
-                    # Reactions
+                    # Reactions (Horizontal Layout)
                     reactions = post.get('reactions', '')
                     if reactions:
                         st.markdown(f"Réactions: {reactions}")
                     
-                    # Add reaction
-                    col_r1, col_r2, col_r3, col_r4, col_r5 = st.columns(5)
-                    with col_r1:
+                    # Custom HTML for horizontal reaction buttons
+                    st.markdown('<div class="reaction-container">', unsafe_allow_html=True)
+                    cols = st.columns([1,1,1,1,6]) # Force small columns for buttons
+                    with cols[0]:
                         if st.button("👍", key=f"like_{idx}"):
                             add_reaction(idx, "👍")
                             st.rerun()
-                    with col_r2:
+                    with cols[1]:
                         if st.button("❤️", key=f"love_{idx}"):
                             add_reaction(idx, "❤️")
                             st.rerun()
-                    with col_r3:
+                    with cols[2]:
                         if st.button("😂", key=f"laugh_{idx}"):
                             add_reaction(idx, "😂")
                             st.rerun()
-                    with col_r4:
+                    with cols[3]:
                         if st.button("🎮", key=f"game_{idx}"):
                             add_reaction(idx, "🎮")
                             st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
                     
                     # Comments
-                    comments = post.get('comments', '')
-                    if comments and comments != '':
+                    comments = post.get('comments', [])
+                    if isinstance(comments, str): # Handle legacy
+                        try:
+                            comments = json.loads(comments)
+                        except:
+                            comments = []
+                            
+                    if comments:
                         st.markdown("**Commentaires:**")
-                        for comment in comments.split('|||'):
-                            if comment:
-                                st.markdown(f"• {comment}")
+                        for c_idx, comment in enumerate(comments):
+                            # Professional comment layout
+                            st.markdown(f"""
+                            <div class="comment-box">
+                                <div class="comment-header">
+                                    <span class="comment-author">{comment.get('author', 'Anonyme')}</span>
+                                    <span>{comment.get('timestamp', '')}</span>
+                                </div>
+                                <div class="comment-text">{comment.get('text', '')}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Delete comment button
+                            if st.button("🗑️", key=f"del_com_{idx}_{c_idx}"):
+                                delete_comment(idx, c_idx)
+                                st.rerun()
                     
                     # Add comment
                     with st.form(f"comment_{idx}"):
-                        new_comment = st.text_input("Ajouter un commentaire:", key=f"new_comment_{idx}")
-                        if st.form_submit_button("💬"):
-                            if new_comment:
-                                add_comment_to_post(idx, new_comment)
+                        col_c1, col_c2 = st.columns([1, 3])
+                        with col_c1:
+                            c_author = st.text_input("Nom:", key=f"c_name_{idx}")
+                        with col_c2:
+                            c_text = st.text_input("Commentaire:", key=f"c_text_{idx}")
+                            
+                        if st.form_submit_button("💬 Commenter"):
+                            if c_author and c_text:
+                                add_comment_to_post(idx, c_author, c_text)
                                 st.rerun()
+                            else:
+                                st.error("Nom et message requis")
                 
                 with col2:
+                    # Post deletion
+                    if st.button("🗑️", key=f"del_post_{idx}", help="Supprimer mon post"):
+                        delete_forum_post(idx)
+                        st.success("Supprimé")
+                        st.rerun()
+                        
                     if not post.get('reported', False):
                         # Initialize report form state for this post if needed
                         if f"show_report_{idx}" not in st.session_state:
