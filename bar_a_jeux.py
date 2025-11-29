@@ -27,7 +27,7 @@ st.markdown("---")
 # Load geodata
 @st.cache_data
 def load_data():
-    gdf_bar = gpd.read_file("bars.gpkg")
+    gdf_bar = gpd.read_file("liste_bar_OK.geojson")
     
     # The geometry appears to be in a projected coordinate system (likely Lambert 93 for France)
     # Need to convert to WGS84 (EPSG:4326) for lat/lon
