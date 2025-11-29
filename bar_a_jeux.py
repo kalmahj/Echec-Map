@@ -283,8 +283,11 @@ def report_forum_post(index, reason):
         pass
 
 def add_reaction(index, emoji):
-    if 'reactions' not in st.session_state.forum_posts[index] or pd.isna(st.session_state.forum_posts[index]['reactions']):
-        st.session_state.forum_posts[index]['reactions'] = emoji
+    post = st.session_state.forum_posts[index]
+    
+    # Safe check for reactions
+    if 'reactions' not in post or post['reactions'] is None or (isinstance(post['reactions'], float) and pd.isna(post['reactions'])):
+        post['reactions'] = emoji
     else:
         # Check if already reacted to avoid duplicates if desired, or just append
         current = st.session_state.forum_posts[index]['reactions']
@@ -303,16 +306,24 @@ def add_reaction(index, emoji):
 
 def add_comment_to_post(index, author, text):
     # Initialize comments list if needed
-    if 'comments' not in st.session_state.forum_posts[index] or pd.isna(st.session_state.forum_posts[index]['comments']):
-        st.session_state.forum_posts[index]['comments'] = []
-    elif isinstance(st.session_state.forum_posts[index]['comments'], str):
+    post = st.session_state.forum_posts[index]
+    
+    # Safe check for comments existence and type
+    if 'comments' not in post or post['comments'] is None:
+        post['comments'] = []
+    elif isinstance(post['comments'], float): # Handle NaN from pandas
+        post['comments'] = []
+    elif isinstance(post['comments'], str):
         # Handle legacy string format or JSON string
         try:
-            st.session_state.forum_posts[index]['comments'] = json.loads(st.session_state.forum_posts[index]['comments'])
+            post['comments'] = json.loads(post['comments'])
         except:
             # Legacy ||| format
-            legacy = st.session_state.forum_posts[index]['comments'].split('|||')
-            st.session_state.forum_posts[index]['comments'] = [{'author': 'Anonyme', 'text': c, 'timestamp': ''} for c in legacy if c]
+            legacy = post['comments'].split('|||')
+            post['comments'] = [{'author': 'Anonyme', 'text': c, 'timestamp': ''} for c in legacy if c]
+    elif not isinstance(post['comments'], list):
+        # Fallback for any other non-list type
+        post['comments'] = []
 
     # Add new comment
     new_comment = {
