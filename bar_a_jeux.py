@@ -73,10 +73,35 @@ BAR_CSV_MAPPING = {
 # Auto-commit CSV function
 def auto_commit_csv():
     try:
-        subprocess.run(['git', 'add', FORUM_CSV_PATH, GAME_REQUESTS_CSV_PATH], cwd=os.path.dirname(__file__), check=False)
-        subprocess.run(['git', 'commit', '-m', 'Auto-update CSV files'], cwd=os.path.dirname(__file__), check=False)
-    except:
-        pass
+        # Add files
+        result_add = subprocess.run(['git', 'add', FORUM_CSV_PATH, GAME_REQUESTS_CSV_PATH], 
+                                  cwd=os.path.dirname(__file__), 
+                                  capture_output=True, 
+                                  text=True)
+        if result_add.returncode != 0:
+            st.error(f"Git Add Error: {result_add.stderr}")
+            print(f"Git Add Error: {result_add.stderr}")
+            
+        # Commit changes
+        result_commit = subprocess.run(['git', 'commit', '-m', 'Auto-update CSV files'], 
+                                     cwd=os.path.dirname(__file__), 
+                                     capture_output=True, 
+                                     text=True)
+        
+        if result_commit.returncode != 0:
+            # Ignore "nothing to commit" errors
+            if "nothing to commit" not in result_commit.stdout:
+                st.error(f"Git Commit Error: {result_commit.stderr}")
+                print(f"Git Commit Error: {result_commit.stderr}")
+            else:
+                print("Nothing to commit")
+        else:
+            st.toast("✅ Sauvegardé et commité !", icon="💾")
+            print("Auto-commit successful")
+            
+    except Exception as e:
+        st.error(f"Auto-commit failed: {str(e)}")
+        print(f"Auto-commit exception: {str(e)}")
 
 @st.cache_data
 def detect_encoding(file_path):
