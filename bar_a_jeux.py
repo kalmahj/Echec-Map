@@ -11,7 +11,7 @@ import chardet
 import subprocess
 
 # Page config
-st.set_page_config(page_title="Bars à Jeux Paris", page_icon="🎮", layout="wide")
+st.set_page_config(page_title="Echec et Map", page_icon="🎮", layout="wide")
 
 # CSS
 st.markdown("""
@@ -288,8 +288,8 @@ if st.session_state.show_admin_panel:
     st.markdown("---")
 
 # Header
-st.title("🎮 Bars à Jeux Paris")
-st.markdown("*Trouvez votre bar et connectez-vous avec d'autres joueurs !*")
+st.title("🎮 Echec et Map")
+st.markdown("*Une application pour les amateurs de jeux de sociétés !*")
 st.markdown("---")
 
 @st.cache_data
@@ -305,9 +305,9 @@ try:
     
     # Tabs
     if st.session_state.admin_logged_in:
-        tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Carte", "🎮 Jeux", "💬 Forum", "🔧 Admin"])
+        tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Carte", "🎮 Liste de jeux", "💬 Forum", "🔧 Admin"])
     else:
-        tab1, tab2, tab3 = st.tabs(["🗺️ Carte", "🎮 Jeux", "💬 Forum"])
+        tab1, tab2, tab3 = st.tabs(["🗺️ Carte", "🎮 Liste de jeux", "💬 Forum"])
     
     # TAB 1: Map
     with tab1:
@@ -464,7 +464,7 @@ try:
             date_time = st.text_input("Quand :", placeholder="ex: Demain 19h")
             message = st.text_area("Message :")
             
-            if st.form_submit_button("📤 Publier"):
+            if st.form_submit_button("Publier"):
                 if username and message and game_choice:
                     post = {
                         'username': username,
@@ -528,7 +528,7 @@ try:
                     # Comments
                     comments = post.get('comments', '')
                     if comments and comments != '':
-                        st.markdown("**💬 Commentaires:**")
+                        st.markdown("**Commentaires:**")
                         for comment in comments.split('|||'):
                             if comment:
                                 st.markdown(f"• {comment}")
@@ -543,11 +543,13 @@ try:
                 
                 with col2:
                     if not post.get('reported', False):
-                        if st.button("🚩", key=f"report_{idx}"):
-                            report_reason = st.text_input("Raison:", key=f"reason_{idx}")
-                            if report_reason:
-                                report_forum_post(idx, report_reason)
-                                st.rerun()
+                        with st.expander("🚩 Signaler"):
+                            with st.form(f"report_form_{idx}"):
+                                reason = st.text_input("Raison :")
+                                if st.form_submit_button("Envoyer"):
+                                    report_forum_post(idx, reason)
+                                    st.success("Signalé à l'admin")
+                                    st.rerun()
                 
                 st.markdown("---")
     
@@ -556,7 +558,7 @@ try:
         with tab4:
             st.subheader("🔧 Administration")
             
-            st.markdown("### Requêtes Jeux")
+            st.markdown("### 📋 Requêtes d'ajout/modification")
             status_filter = st.selectbox("Statut :", ["Tous", "En attente", "Approuvé", "Rejeté"])
             
             filtered_reqs = st.session_state.game_requests.copy()
@@ -573,41 +575,56 @@ try:
                 real_idx = st.session_state.game_requests.index(req)
                 
                 status_icon = "🔵" if req['status'] == 'pending' else "✅" if req['status'] == 'approved' else "❌"
-                st.markdown(f"""<div class='bar-box'><strong>{status_icon} {req['game_name']} @ {req['bar_name']}</strong></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class='bar-box'><strong>{status_icon} {req['game_name']} @ {req['bar_name']}</strong><br>
+                <small>Type: {req['action_type']}</small></div>""", unsafe_allow_html=True)
                 
                 col1, col2 = st.columns([3, 1])
                 with col1:
                     st.write(f"**Date:** {req['timestamp']}")
                     st.write(f"**User:** {req['username']}")
+                    if req['description']:
+                        st.write(f"**Desc:** {req['description']}")
                 with col2:
                     if req['status'] == 'pending':
-                        if st.button("✅", key=f"app_{real_idx}"):
+                        if st.button("✅ Approuver", key=f"app_{real_idx}"):
                             approve_game_request(real_idx)
+                            st.success("Approuvé")
                             st.rerun()
-                        if st.button("❌", key=f"rej_{real_idx}"):
+                        if st.button("❌ Rejeter", key=f"rej_{real_idx}"):
                             reject_game_request(real_idx)
+                            st.warning("Rejeté")
                             st.rerun()
                 st.markdown("---")
             
-            st.markdown("### Modération Forum")
+            st.markdown("### 🚨 Signalements Forum")
             reported_posts = [i for i, p in enumerate(st.session_state.forum_posts) if p.get('reported', False)]
             
             if reported_posts:
-                st.warning(f"🚩 {len(reported_posts)} signalé(s)")
+                st.warning(f"{len(reported_posts)} post(s) signalé(s)")
                 for idx in reported_posts:
                     post = st.session_state.forum_posts[idx]
-                    col1, col2 = st.columns([4, 1])
+                    st.markdown(f"""<div style='border: 1px solid red; padding: 10px; border-radius: 5px;'>
+                    <strong>Auteur:</strong> {post['username']}<br>
+                    <strong>Message:</strong> {post['message']}<br>
+                    <strong>Raison du signalement:</strong> {post.get('report_reason', 'Non spécifiée')}
+                    </div>""", unsafe_allow_html=True)
+                    
+                    col1, col2 = st.columns(2)
                     with col1:
-                        st.markdown(f"**{post['username']}** • {post['timestamp']}")
-                        st.markdown(f"{post['message']}")
-                        st.markdown(f"**Raison:** {post.get('report_reason', 'Non spécifiée')}")
-                    with col2:
-                        if st.button("🗑️", key=f"del_{idx}"):
+                        if st.button("🗑️ Supprimer le post", key=f"del_{idx}"):
                             delete_forum_post(idx)
+                            st.success("Post supprimé")
+                            st.rerun()
+                    with col2:
+                        if st.button("✅ Ignorer (Retirer signalement)", key=f"ignore_{idx}"):
+                            # Just remove reported flag
+                            st.session_state.forum_posts[idx]['reported'] = False
+                            save_forum_comment(st.session_state.forum_posts[idx]) # Save state change
+                            st.info("Signalement retiré")
                             st.rerun()
                     st.markdown("---")
             else:
-                st.info("Aucun signalement")
+                st.info("Aucun signalement à traiter")
 
 except FileNotFoundError:
     st.error("⚠️ Fichier introuvable")
