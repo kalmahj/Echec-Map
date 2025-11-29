@@ -817,4 +817,4 @@ except Exception as e:
     st.error(f"⚠️ Erreur: {str(e)}")
 
 st.markdown("---")
-st.markdown("*Créé par Kalma et José bestie :)*")
+st.markdown("*Propriété d'Echec et Map*")
