@@ -151,12 +151,20 @@ def auto_commit_csv():
     except Exception as e:
         st.error(f"Auto-commit failed: {str(e)}")
 
-@st.cache_data
 def detect_encoding(file_path):
     with open(file_path, 'rb') as f:
         raw_data = f.read(10000)
     result = chardet.detect(raw_data)
     return result['encoding']
+
+def load_game_requests():
+    if os.path.exists(GAME_REQUESTS_CSV_PATH):
+        try:
+            df = pd.read_csv(GAME_REQUESTS_CSV_PATH, encoding='utf-8')
+            return df.to_dict('records')
+        except:
+            return []
+    return []
 
 @st.cache_data
 def load_games_from_csv():
@@ -197,177 +205,6 @@ def load_forum_comments():
         except:
             return []
     return []
-
-def save_forum_comment(post):
-    try:
-        if os.path.exists(FORUM_CSV_PATH):
-            df = pd.read_csv(FORUM_CSV_PATH, encoding='utf-8')
-        else:
-            df = pd.DataFrame(columns=['username', 'bar', 'game', 'when', 'message', 'timestamp', 'reported', 'report_reason', 'reactions', 'comments'])
-        
-        # Ensure comments are stored as JSON string
-        if 'comments' in post and isinstance(post['comments'], list):
-            post['comments'] = json.dumps(post['comments'])
-            
-        new_row = pd.DataFrame([post])
-        df = pd.concat([df, new_row], ignore_index=True)
-        df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
-        auto_commit_csv()
-    except Exception as e:
-        st.error(f"Erreur sauvegarde: {e}")
-
-def load_game_requests():
-    if os.path.exists(GAME_REQUESTS_CSV_PATH):
-        try:
-            df = pd.read_csv(GAME_REQUESTS_CSV_PATH, encoding='utf-8')
-            return df.to_dict('records')
-        except:
-            return []
-    return []
-
-def save_game_request(request):
-    try:
-        if os.path.exists(GAME_REQUESTS_CSV_PATH):
-            df = pd.read_csv(GAME_REQUESTS_CSV_PATH, encoding='utf-8')
-        else:
-            df = pd.DataFrame(columns=['timestamp', 'username', 'bar_name', 'game_name', 'action_type', 'description', 'status'])
-        
-        new_row = pd.DataFrame([request])
-        df = pd.concat([df, new_row], ignore_index=True)
-        df.to_csv(GAME_REQUESTS_CSV_PATH, index=False, encoding='utf-8')
-        auto_commit_csv()
-    except:
-        pass
-
-def approve_game_request(index):
-    request = st.session_state.game_requests[index]
-    new_row = pd.DataFrame({'bar_name': [request['bar_name']], 'game': [request['game_name']]})
-    st.session_state.games_data = pd.concat([st.session_state.games_data, new_row], ignore_index=True)
-    request['status'] = 'approved'
-    df = pd.DataFrame(st.session_state.game_requests)
-    df.to_csv(GAME_REQUESTS_CSV_PATH, index=False, encoding='utf-8')
-    auto_commit_csv()
-
-def reject_game_request(index):
-    request = st.session_state.game_requests[index]
-    request['status'] = 'rejected'
-    df = pd.DataFrame(st.session_state.game_requests)
-    df.to_csv(GAME_REQUESTS_CSV_PATH, index=False, encoding='utf-8')
-    auto_commit_csv()
-
-def delete_forum_post(index):
-    st.session_state.forum_posts.pop(index)
-    try:
-        df = pd.DataFrame(st.session_state.forum_posts)
-        # Ensure comments are serialized
-        for i in range(len(df)):
-            if 'comments' in df.iloc[i] and isinstance(df.iloc[i]['comments'], list):
-                df.at[i, 'comments'] = json.dumps(df.iloc[i]['comments'])
-        df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
-        auto_commit_csv()
-    except:
-        pass
-
-def report_forum_post(index, reason):
-    st.session_state.forum_posts[index]['reported'] = True
-    st.session_state.forum_posts[index]['report_reason'] = reason
-    try:
-        df = pd.DataFrame(st.session_state.forum_posts)
-        # Ensure comments are serialized
-        for i in range(len(df)):
-            if 'comments' in df.iloc[i] and isinstance(df.iloc[i]['comments'], list):
-                df.at[i, 'comments'] = json.dumps(df.iloc[i]['comments'])
-        df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
-        auto_commit_csv()
-    except:
-        pass
-
-def add_reaction(index, emoji):
-    post = st.session_state.forum_posts[index]
-    
-    # Safe check for reactions
-    if 'reactions' not in post or post['reactions'] is None or (isinstance(post['reactions'], float) and pd.isna(post['reactions'])):
-        post['reactions'] = emoji
-    else:
-        # Check if already reacted to avoid duplicates if desired, or just append
-        current = st.session_state.forum_posts[index]['reactions']
-        if emoji not in current: # Simple toggle logic could be added here
-            st.session_state.forum_posts[index]['reactions'] += f",{emoji}"
-    try:
-        df = pd.DataFrame(st.session_state.forum_posts)
-        # Ensure comments are serialized
-        for i in range(len(df)):
-            if 'comments' in df.iloc[i] and isinstance(df.iloc[i]['comments'], list):
-                df.at[i, 'comments'] = json.dumps(df.iloc[i]['comments'])
-        df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
-        auto_commit_csv()
-    except:
-        pass
-
-def add_comment_to_post(index, author, text):
-    # Initialize comments list if needed
-    post = st.session_state.forum_posts[index]
-    
-    # Safe check for comments existence and type
-    if 'comments' not in post or post['comments'] is None:
-        post['comments'] = []
-    elif isinstance(post['comments'], float): # Handle NaN from pandas
-        post['comments'] = []
-    elif isinstance(post['comments'], str):
-        # Handle legacy string format or JSON string
-        try:
-            post['comments'] = json.loads(post['comments'])
-        except:
-            # Legacy ||| format
-            legacy = post['comments'].split('|||')
-            post['comments'] = [{'author': 'Anonyme', 'text': c, 'timestamp': ''} for c in legacy if c]
-    elif not isinstance(post['comments'], list):
-        # Fallback for any other non-list type
-        post['comments'] = []
-
-    # Add new comment
-    new_comment = {
-        'author': author,
-        'text': text,
-        'timestamp': datetime.now().strftime("%d/%m %H:%M"),
-        'reactions': ''
-    }
-    st.session_state.forum_posts[index]['comments'].append(new_comment)
-    
-    try:
-        df = pd.DataFrame(st.session_state.forum_posts)
-        # Serialize comments to JSON for CSV storage
-        for i in range(len(df)):
-            if 'comments' in df.iloc[i] and isinstance(df.iloc[i]['comments'], list):
-                df.at[i, 'comments'] = json.dumps(df.iloc[i]['comments'])
-        
-        df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
-        auto_commit_csv()
-    except Exception as e:
-        st.error(f"Erreur ajout commentaire: {e}")
-
-def delete_comment(post_index, comment_index):
-    try:
-        # Ensure comments are loaded as list
-        comments = st.session_state.forum_posts[post_index]['comments']
-        if isinstance(comments, str):
-            try:
-                comments = json.loads(comments)
-            except:
-                comments = []
-        
-        if 0 <= comment_index < len(comments):
-            comments.pop(comment_index)
-            st.session_state.forum_posts[post_index]['comments'] = comments
-            
-            df = pd.DataFrame(st.session_state.forum_posts)
-            for i in range(len(df)):
-                if 'comments' in df.iloc[i] and isinstance(df.iloc[i]['comments'], list):
-                    df.at[i, 'comments'] = json.dumps(df.iloc[i]['comments'])
-            df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
-            auto_commit_csv()
-    except:
-        pass
 
 # Load data
 if len(st.session_state.forum_posts) == 0:
@@ -444,7 +281,7 @@ def load_data():
 try:
     gdf_bar = load_data()
     
-    # Tabs
+    # Tabs 
     if st.session_state.admin_logged_in:
         tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Carte", "🎮 Liste de jeux", "💬 Forum", "🔧 Admin"])
     else:
