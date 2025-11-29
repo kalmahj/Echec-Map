@@ -37,19 +37,19 @@ st.markdown("""
     .reaction-container {
         display: flex;
         flex-direction: row;
-        gap: 10px;
+        gap: 5px;
         flex-wrap: wrap;
         margin-top: 5px;
     }
     .reaction-btn {
-        background: none;
-        border: 1px solid #ddd;
-        border-radius: 15px;
-        padding: 2px 8px;
+        background: none !important;
+        border: none !important;
+        padding: 0 5px !important;
         cursor: pointer;
-        font-size: 14px;
+        font-size: 18px !important; /* Slightly larger emoji for visibility */
+        line-height: 1.2;
     }
-    .reaction-btn:hover {background-color: #f0f0f0;}
+    .reaction-btn:hover {transform: scale(1.2);}
     
     /* Comment styling */
     .comment-box {
@@ -114,26 +114,42 @@ BAR_CSV_MAPPING = {
 
 # Auto-commit CSV function
 def auto_commit_csv():
+    repo_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Check if git is initialized
+    if not os.path.exists(os.path.join(repo_dir, ".git")):
+        st.error("⚠️ Git n'est pas initialisé dans ce dossier.")
+        return
+
     try:
         # Add files
-        result_add = subprocess.run(['git', 'add', FORUM_CSV_PATH, GAME_REQUESTS_CSV_PATH], 
-                                  cwd=os.path.dirname(__file__), 
+        result_add = subprocess.run(['git', 'add', 'forum_comments.csv', 'game_requests.csv'], 
+                                  cwd=repo_dir, 
                                   capture_output=True, 
                                   text=True)
+        
         if result_add.returncode != 0:
-            print(f"Git Add Error: {result_add.stderr}")
+            st.error(f"Git Add Error: {result_add.stderr}")
+            return
             
         # Commit changes
         result_commit = subprocess.run(['git', 'commit', '-m', 'Auto-update CSV files'], 
-                                     cwd=os.path.dirname(__file__), 
+                                     cwd=repo_dir, 
                                      capture_output=True, 
                                      text=True)
         
-        if result_commit.returncode == 0:
+        if result_commit.returncode != 0:
+            if "nothing to commit" in result_commit.stdout.lower():
+                pass # No changes
+            else:
+                st.error(f"Git Commit Error: {result_commit.stderr}")
+        else:
             st.toast("✅ Sauvegardé et commité !", icon="💾")
             
+    except FileNotFoundError:
+        st.error("⚠️ Git n'est pas installé ou n'est pas dans le PATH.")
     except Exception as e:
-        print(f"Auto-commit exception: {str(e)}")
+        st.error(f"Auto-commit failed: {str(e)}")
 
 @st.cache_data
 def detect_encoding(file_path):
