@@ -1,0 +1,9 @@
+[theme]
+primaryColor = "#1E90FF"  # Dodger Blue
+backgroundColor = "#F0F8FF"  # Alice Blue
+secondaryBackgroundColor = "#E6F3FF"  # Light Blue
+textColor = "#1A1A2E"  # Dark Blue-Gray
+font = "sans serif"
+
+[server]
+headless = true

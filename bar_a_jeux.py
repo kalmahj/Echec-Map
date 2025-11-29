@@ -8,21 +8,94 @@ import pandas as pd
 import geopandas as gpd
 from datetime import datetime
 import os
-import glob
+import chardet
 
 # Configuration de la page
 st.set_page_config(page_title="Bars à Jeux Paris", page_icon="🎮", layout="wide")
 
-# Initialiser session state pour les posts du forum
+# Custom CSS pour le thème bleu et les polices personnalisées
+st.markdown("""
+<style>
+    /* Import fallback fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@700&family=Montserrat:wght@600&family=Open+Sans&display=swap');
+    
+    /* Titres principaux - Rockwell/Castellar avec fallback */
+    h1 {
+        font-family: 'Rockwell', 'Castellar', 'Roboto Slab', serif !important;
+        color: #003366 !important;
+        font-weight: bold !important;
+    }
+    
+    /* Sous-titres - Eras Demi avec fallback */
+    h2, h3 {
+        font-family: 'Eras Demi ITC', 'Montserrat', sans-serif !important;
+        color: #0066CC !important;
+    }
+    
+    /* Corps de texte - Corbel avec fallback */
+    p, div, span, label, input, textarea, select {
+        font-family: 'Corbel', 'Open Sans', sans-serif !important;
+    }
+    
+    /* Boutons bleus */
+    .stButton>button {
+        background-color: #1E90FF !important;
+        color: white !important;
+        border-radius: 8px !important;
+        border: none !important;
+        font-family: 'Corbel', 'Open Sans', sans-serif !important;
+    }
+    
+    .stButton>button:hover {
+        background-color: #0066CC !important;
+    }
+    
+    /* Tabs styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background-color: #E6F3FF;
+        border-radius: 8px 8px 0px 0px;
+        font-family: 'Corbel', 'Open Sans', sans-serif !important;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #1E90FF !important;
+        color: white !important;
+    }
+    
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        background-color: #E6F3FF !important;
+        border-radius: 8px !important;
+        font-family: 'Corbel', 'Open Sans', sans-serif !important;
+    }
+    
+    /* Alert boxes */
+    .stAlert {
+        border-radius: 8px !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Initialiser session state
 if 'forum_posts' not in st.session_state:
     st.session_state.forum_posts = []
 
-# Initialiser session state pour les données de jeux
 if 'games_data' not in st.session_state:
     st.session_state.games_data = pd.DataFrame(columns=['bar_name', 'game'])
 
-# Chemin vers le fichier CSV des commentaires du forum
+if 'game_requests' not in st.session_state:
+    st.session_state.game_requests = []
+
+if 'admin_logged_in' not in st.session_state:
+    st.session_state.admin_logged_in = False
+
+# Chemins des fichiers CSV
 FORUM_CSV_PATH = os.path.join(os.path.dirname(__file__), 'forum_comments.csv')
+GAME_REQUESTS_CSV_PATH = os.path.join(os.path.dirname(__file__), 'game_requests.csv')
 
 # Mapping des noms de fichiers CSV vers les noms de bars dans le GeoJSON
 BAR_CSV_MAPPING = {
@@ -40,10 +113,18 @@ BAR_CSV_MAPPING = {
     'liste_jeux_oya.csv': 'Oya Café',
 }
 
+# Fonction pour détecter l'encodage d'un fichier
+def detect_encoding(file_path):
+    """Détecte l'encodage d'un fichier en lisant les premiers octets"""
+    with open(file_path, 'rb') as f:
+        raw_data = f.read(10000)
+    result = chardet.detect(raw_data)
+    return result['encoding']
+
 # Fonction pour charger les jeux depuis les fichiers CSV
 @st.cache_data
 def load_games_from_csv():
-    """Charge tous les jeux depuis les fichiers CSV du dossier Scraping Liste Jeux"""
+    """Charge tous les jeux depuis les fichiers CSV avec détection d'encodage"""
     games_list = []
     csv_folder = os.path.join(os.path.dirname(__file__), 'Scraping Liste Jeux')
     
@@ -54,55 +135,121 @@ def load_games_from_csv():
         csv_path = os.path.join(csv_folder, csv_file)
         if os.path.exists(csv_path):
             try:
-                # Lire le CSV avec délimiteur point-virgule
-                df = pd.read_csv(csv_path, sep=';', encoding='utf-8')
+                encoding = detect_encoding(csv_path)
+                try:
+                    df = pd.read_csv(csv_path, sep=';', encoding=encoding)
+                except:
+                    for enc in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
+                        try:
+                            df = pd.read_csv(csv_path, sep=';', encoding=enc)
+                            break
+                        except:
+                            continue
+                
                 if 'Nom du jeu' in df.columns:
-                    # Extraire les noms de jeux et les associer au bar
                     for game_name in df['Nom du jeu'].dropna().unique():
                         games_list.append({'bar_name': bar_name, 'game': str(game_name)})
             except Exception as e:
-                st.warning(f"Erreur lors du chargement de {csv_file}: {e}")
+                st.warning(f"⚠️ Erreur lors du chargement de {csv_file}: {e}")
     
     return pd.DataFrame(games_list)
 
-# Fonction pour charger les commentaires du forum depuis le CSV
+# Fonction pour charger les commentaires du forum
 def load_forum_comments():
-    """Charge les commentaires du forum depuis le fichier CSV s'il existe"""
+    """Charge les commentaires du forum depuis le fichier CSV"""
     if os.path.exists(FORUM_CSV_PATH):
         try:
             df = pd.read_csv(FORUM_CSV_PATH, encoding='utf-8')
             return df.to_dict('records')
-        except Exception as e:
-            st.warning(f"Erreur lors du chargement des commentaires: {e}")
+        except:
             return []
     return []
 
-# Fonction pour sauvegarder un commentaire dans le CSV
+# Fonction pour sauvegarder un commentaire
 def save_forum_comment(post):
-    """Sauvegarde un nouveau commentaire dans le fichier CSV"""
+    """Sauvegarde un commentaire dans le fichier CSV"""
     try:
-        # Charger les commentaires existants ou créer un nouveau DataFrame
         if os.path.exists(FORUM_CSV_PATH):
             df = pd.read_csv(FORUM_CSV_PATH, encoding='utf-8')
         else:
             df = pd.DataFrame(columns=['username', 'bar', 'game', 'when', 'message', 'timestamp'])
         
-        # Ajouter le nouveau commentaire
         new_row = pd.DataFrame([post])
         df = pd.concat([df, new_row], ignore_index=True)
-        
-        # Sauvegarder dans le CSV
         df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
     except Exception as e:
-        st.error(f"Erreur lors de la sauvegarde du commentaire: {e}")
+        st.error(f"Erreur lors de la sauvegarde: {e}")
 
-# Charger les commentaires du forum au démarrage (une seule fois)
+# Fonction pour charger les requêtes de jeux
+def load_game_requests():
+    """Charge les requêtes de jeux depuis le fichier CSV"""
+    if os.path.exists(GAME_REQUESTS_CSV_PATH):
+        try:
+            df = pd.read_csv(GAME_REQUESTS_CSV_PATH, encoding='utf-8')
+            return df.to_dict('records')
+        except:
+            return []
+    return []
+
+# Fonction pour sauvegarder une requête de jeu
+def save_game_request(request):
+    """Sauvegarde une requête de jeu dans le fichier CSV"""
+    try:
+        if os.path.exists(GAME_REQUESTS_CSV_PATH):
+            df = pd.read_csv(GAME_REQUESTS_CSV_PATH, encoding='utf-8')
+        else:
+            df = pd.DataFrame(columns=['timestamp', 'username', 'bar_name', 'game_name', 'action_type', 'description', 'status'])
+        
+        new_row = pd.DataFrame([request])
+        df = pd.concat([df, new_row], ignore_index=True)
+        df.to_csv(GAME_REQUESTS_CSV_PATH, index=False, encoding='utf-8')
+    except Exception as e:
+        st.error(f"Erreur lors de la sauvegarde: {e}")
+
+# Fonction pour approuver une requête
+def approve_game_request(index):
+    """Approuve une requête et ajoute le jeu à la base"""
+    request = st.session_state.game_requests[index]
+    new_row = pd.DataFrame({'bar_name': [request['bar_name']], 'game': [request['game_name']]})
+    st.session_state.games_data = pd.concat([st.session_state.games_data, new_row], ignore_index=True)
+    request['status'] = 'approved'
+    df = pd.DataFrame(st.session_state.game_requests)
+    df.to_csv(GAME_REQUESTS_CSV_PATH, index=False, encoding='utf-8')
+
+# Fonction pour rejeter une requête
+def reject_game_request(index):
+    """Rejette une requête"""
+    request = st.session_state.game_requests[index]
+    request['status'] = 'rejected'
+    df = pd.DataFrame(st.session_state.game_requests)
+    df.to_csv(GAME_REQUESTS_CSV_PATH, index=False, encoding='utf-8')
+
+# Charger les données au démarrage
 if len(st.session_state.forum_posts) == 0:
     st.session_state.forum_posts = load_forum_comments()
 
-# Charger les jeux depuis les CSV (une seule fois)
 if st.session_state.games_data.empty:
     st.session_state.games_data = load_games_from_csv()
+
+if len(st.session_state.game_requests) == 0:
+    st.session_state.game_requests = load_game_requests()
+
+# SIDEBAR - Admin Login
+with st.sidebar:
+    st.markdown("### 👤 Profil Administrateur")
+    if not st.session_state.admin_logged_in:
+        admin_password = st.text_input("Mot de passe Admin:", type="password", key="admin_pw")
+        if st.button("Se connecter"):
+            if admin_password == "admin123":
+                st.session_state.admin_logged_in = True
+                st.rerun()
+            else:
+                st.error("❌ Mot de passe incorrect")
+    else:
+        st.success("✅ Connecté en tant qu'administrateur")
+        if st.button("Se déconnecter"):
+            st.session_state.admin_logged_in = False
+            st.rerun()
 
 # En-tête
 st.title("🎮 Recherche de Bars à Jeux à Paris")
@@ -112,23 +259,20 @@ st.markdown("---")
 # Charger les données géographiques
 @st.cache_data
 def load_data():
-    # Charger le fichier GeoJSON
     gdf_bar = gpd.read_file("liste_bar_OK.geojson")
-    
-    # Extraire les coordonnées depuis les colonnes existantes
     gdf_bar['lon'] = pd.to_numeric(gdf_bar['longitude'], errors='coerce')
     gdf_bar['lat'] = pd.to_numeric(gdf_bar['latitude'], errors='coerce')
-    
-    # Nettoyer les données - supprimer les lignes sans nom ou sans coordonnées
     gdf_bar = gdf_bar[gdf_bar['Nom'].notna() & gdf_bar['lon'].notna() & gdf_bar['lat'].notna()]
-    
     return gdf_bar
 
 try:
     gdf_bar = load_data()
     
-    # Créer les onglets
-    tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Carte et Recherche", "📋 Tous les Bars", "🎮 Gérer les Jeux", "💬 Forum Communautaire"])
+    # Créer les onglets (sans admin si pas connecté)
+    if st.session_state.admin_logged_in:
+        tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Carte et Recherche", "🎮 Liste des Jeux", "💬 Forum Communautaire", "🔧 Admin"])
+    else:
+        tab1, tab2, tab3 = st.tabs(["🗺️ Carte et Recherche", "🎮 Liste des Jeux", "💬 Forum Communautaire"])
     
     # ONGLET 1: Carte et Recherche
     with tab1:
@@ -137,43 +281,52 @@ try:
         with col2:
             st.subheader("🔍 Trouver un Bar")
             
-            # Recherche par nom
             search_name = st.text_input("Rechercher par nom :", placeholder="Entrez le nom du bar...")
             
-            # Recherche par arrondissement
-            arrondissements = sorted(gdf_bar['Arrondissement'].dropna().unique())
+            # Trier les arrondissements par ordre croissant
+            arrondissements = sorted(gdf_bar['Arrondissement'].dropna().unique(), key=lambda x: int(x) if str(x).isdigit() else 999)
             selected_arrond = st.selectbox("Filtrer par arrondissement :", ["Tous"] + [str(a) for a in arrondissements])
             
-            # Recherche par jeu (si des données de jeux existent)
             if not st.session_state.games_data.empty:
                 all_games = sorted(st.session_state.games_data['game'].unique())
                 selected_game = st.selectbox("Rechercher par jeu :", ["Tous les Jeux"] + all_games)
             else:
                 selected_game = "Tous les Jeux"
-                st.info("💡 Allez dans l'onglet 'Gérer les Jeux' pour ajouter des jeux aux bars !")
+                st.info("💡 Allez dans l'onglet 'Liste des Jeux' pour ajouter des jeux !")
             
             # Appliquer les filtres
             filtered_gdf = gdf_bar.copy()
+            has_filter = False
             
             if search_name:
                 filtered_gdf = filtered_gdf[filtered_gdf['Nom'].str.contains(search_name, case=False, na=False)]
+                has_filter = True
             
             if selected_arrond != "Tous":
                 filtered_gdf = filtered_gdf[filtered_gdf['Arrondissement'].astype(str) == selected_arrond]
+                has_filter = True
             
             if selected_game != "Tous les Jeux" and not st.session_state.games_data.empty:
                 bars_with_game = st.session_state.games_data[st.session_state.games_data['game'] == selected_game]['bar_name'].unique()
                 filtered_gdf = filtered_gdf[filtered_gdf['Nom'].isin(bars_with_game)]
+                has_filter = True
                 st.success(f"Trouvé {len(filtered_gdf)} bar(s) avec {selected_game}")
             
-            st.info(f"Affichage de {len(filtered_gdf)} bar(s)")
-            
-            # Afficher la liste des bars filtrés
-            if len(filtered_gdf) > 0:
+            # Afficher la liste SEULEMENT si un filtre est appliqué
+            if has_filter and len(filtered_gdf) > 0:
+                st.info(f"Affichage de {len(filtered_gdf)} bar(s)")
                 st.markdown("---")
                 st.markdown("**Bars affichés :**")
                 for idx, row in filtered_gdf.iterrows():
-                    with st.expander(f"📍 {row['Nom']}"):
+                    # Compter les jeux pour ce bar
+                    bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == row['Nom']]
+                    game_count = len(bar_games)
+                    
+                    st.markdown(f"""<div style='background-color: #E6F3FF; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>
+                    <h4 style='margin:0; color: #0066CC;'>📍 {row['Nom']}</h4>
+                    </div>""", unsafe_allow_html=True)
+                    
+                    with st.container():
                         if pd.notna(row['Adresse']):
                             st.write(f"**Adresse :** {row['Adresse']}")
                         if pd.notna(row['Arrondissement']):
@@ -187,95 +340,116 @@ try:
                         if pd.notna(row['Site']):
                             st.write(f"**Site Web :** {row['Site']}")
                         
-                        # Afficher les jeux si disponibles
-                        bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == row['Nom']]
-                        if not bar_games.empty:
-                            games_list = ", ".join(bar_games['game'].tolist()[:10])  # Limiter à 10 jeux pour l'affichage
-                            if len(bar_games) > 10:
-                                games_list += f" ... (+{len(bar_games) - 10} autres)"
-                            st.write(f"**🎮 Jeux :** {games_list}")
+                        # Afficher seulement le nombre de jeux
+                        if game_count > 0:
+                            st.write(f"**🎮 Nombre de jeux :** {game_count}")
+                        st.markdown("---")
+            elif has_filter:
+                st.warning("Aucun bar trouvé avec les filtres sélectionnés.")
         
         with col1:
             st.subheader("🗺️ Carte des Bars à Jeux")
-            if len(filtered_gdf) > 0:
+            if has_filter and len(filtered_gdf) > 0:
                 st.map(filtered_gdf[['lat', 'lon']])
+            elif not has_filter:
+                # Afficher la carte sans la liste
+                st.map(gdf_bar[['lat', 'lon']])
+                st.info("💡 Cliquez sur les points de la carte et utilisez les filtres pour voir les détails des bars")
             else:
-                st.warning("Aucun bar trouvé avec les filtres sélectionnés.")
+                st.warning("Aucun bar trouvé.")
     
-    # ONGLET 2: Tous les Bars
+    # ONGLET 2: Liste des Jeux
     with tab2:
-        st.subheader("📋 Liste Complète des Bars à Jeux")
+        st.subheader("🎮 Liste des Jeux par Bar")
+        st.markdown("*Recherchez des jeux et demandez l'ajout de nouveaux jeux*")
         
-        # Préparer le DataFrame d'affichage
-        display_df = gdf_bar[['Nom', 'Adresse', 'Arrondissement', 'Code postal', 'Métro', 'Téléphone', 'Site']].copy()
-        
-        # Ajouter une colonne pour les jeux
-        display_df['Jeux'] = display_df['Nom'].apply(
-            lambda name: ", ".join(st.session_state.games_data[st.session_state.games_data['bar_name'] == name]['game'].tolist()[:5])
-            if name in st.session_state.games_data['bar_name'].values else ""
-        )
-        
-        st.dataframe(display_df, use_container_width=True, height=400)
-        
-        # Option de téléchargement
-        csv = display_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Télécharger en CSV",
-            data=csv,
-            file_name="bars_jeux_paris.csv",
-            mime="text/csv",
-        )
-    
-    # ONGLET 3: Gérer les Jeux
-    with tab3:
-        st.subheader("🎮 Gérer les Jeux par Bar")
-        st.markdown("*Ajouter des jeux disponibles dans chaque bar*")
-        
+        # Section de recherche
+        st.markdown("### 🔍 Rechercher des Jeux")
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("**Ajouter un Nouveau Jeu**")
-            with st.form("add_game_form"):
-                selected_bar = st.selectbox("Sélectionner un Bar :", gdf_bar['Nom'].sort_values().tolist())
-                new_game = st.text_input("Nom du Jeu :", placeholder="ex: Échecs, Poker, Scrabble...")
-                
-                if st.form_submit_button("➕ Ajouter le Jeu"):
-                    if new_game:
-                        # Vérifier si la combinaison existe déjà
-                        exists = ((st.session_state.games_data['bar_name'] == selected_bar) & 
-                                 (st.session_state.games_data['game'] == new_game)).any()
-                        
-                        if not exists:
-                            new_row = pd.DataFrame({'bar_name': [selected_bar], 'game': [new_game]})
-                            st.session_state.games_data = pd.concat([st.session_state.games_data, new_row], ignore_index=True)
-                            st.success(f"✅ Ajouté {new_game} à {selected_bar}")
-                            st.rerun()
-                        else:
-                            st.warning("Ce jeu est déjà listé pour ce bar !")
-                    else:
-                        st.error("Veuillez entrer un nom de jeu !")
+            search_bar_filter = st.selectbox("Filtrer par Bar :", ["Tous les Bars"] + sorted(gdf_bar['Nom'].tolist()))
         
         with col2:
-            st.markdown("**Jeux Actuels**")
-            if not st.session_state.games_data.empty:
-                # Grouper par bar
-                for bar in st.session_state.games_data['bar_name'].unique():
-                    games = st.session_state.games_data[st.session_state.games_data['bar_name'] == bar]['game'].tolist()
-                    with st.expander(f"📍 {bar} ({len(games)} jeux)"):
-                        for game in games:
-                            col_a, col_b = st.columns([3, 1])
-                            col_a.write(f"🎮 {game}")
-                            if col_b.button("❌", key=f"del_{bar}_{game}"):
-                                st.session_state.games_data = st.session_state.games_data[
-                                    ~((st.session_state.games_data['bar_name'] == bar) & 
-                                      (st.session_state.games_data['game'] == game))
-                                ]
-                                st.rerun()
-            else:
-                st.info("Aucun jeu ajouté pour le moment. Commencez à ajouter des jeux aux bars !")
+            search_game_text = st.text_input("Rechercher un jeu :", placeholder="Tapez le nom d'un jeu...")
+        
+        # Filtrer les jeux
+        filtered_games = st.session_state.games_data.copy()
+        
+        if search_bar_filter != "Tous les Bars":
+            filtered_games = filtered_games[filtered_games['bar_name'] == search_bar_filter]
+        
+        if search_game_text:
+            filtered_games = filtered_games[filtered_games['game'].str.contains(search_game_text, case=False, na=False)]
+        
+        # Afficher les résultats avec expanders par bar
+        if not filtered_games.empty:
+            st.markdown(f"**{len(filtered_games)} jeu(x) trouvé(s)**")
+            st.markdown("---")
+            
+            # Grouper par bar et utiliser des expanders
+            for bar in filtered_games['bar_name'].unique():
+                games = filtered_games[filtered_games['bar_name'] == bar]['game'].tolist()
+                
+                with st.expander(f"📍 {bar} ({len(games)} jeux)", expanded=False):
+                    # Afficher les jeux en colonnes
+                    cols_per_row = 3
+                    for i in range(0, len(games), cols_per_row):
+                        cols = st.columns(cols_per_row)
+                        for j, game in enumerate(games[i:i+cols_per_row]):
+                            cols[j].write(f"🎮 {game}")
+        else:
+            st.info("Aucun jeu trouvé avec ces critères.")
+        
+        st.markdown("---")
+        
+        # Section de demande d'ajout
+        st.markdown("### ➕ Demander l'Ajout d'un Jeu")
+        st.info("💡 Votre demande sera envoyée à l'administrateur pour approbation.")
+        
+        with st.form("request_game_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                request_username = st.text_input("Votre Nom :", placeholder="Entrez votre nom")
+                request_bar = st.selectbox("Sélectionner un Bar :", gdf_bar['Nom'].sort_values().tolist())
+            
+            with col2:
+                request_game = st.text_input("Nom du Jeu :", placeholder="Tapez le nom du jeu")
+                request_action = st.selectbox("Type de Demande :", ["Ajouter un nouveau jeu", "Modifier un jeu existant"])
+            
+            request_description = st.text_area("Description (optionnel) :", placeholder="Détails supplémentaires...")
+            
+            if st.form_submit_button("📤 Envoyer la Demande"):
+                if request_username and request_game and request_bar:
+                    request = {
+                        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        'username': request_username,
+                        'bar_name': request_bar,
+                        'game_name': request_game,
+                        'action_type': 'add' if request_action == "Ajouter un nouveau jeu" else 'modify',
+                        'description': request_description,
+                        'status': 'pending'
+                    }
+                    st.session_state.game_requests.append(request)
+                    save_game_request(request)
+                    st.success("✅ Votre demande a été envoyée !")
+                else:
+                    st.error("⚠️ Veuillez remplir tous les champs obligatoires !")
+        
+        # Afficher les demandes de l'utilisateur
+        st.markdown("---")
+        st.markdown("### 📋 Mes Demandes")
+        pending_requests = [r for r in st.session_state.game_requests if r['status'] == 'pending']
+        approved_requests = [r for r in st.session_state.game_requests if r['status'] == 'approved']
+        
+        if pending_requests:
+            st.info(f"📌 {len(pending_requests)} demande(s) en attente")
+        if approved_requests:
+            st.success(f"✅ {len(approved_requests)} demande(s) approuvée(s)")
     
-    # ONGLET 4: Forum Communautaire
-    with tab4:
+    # ONGLET 3: Forum Communautaire
+    with tab3:
         st.subheader("💬 Forum Communautaire")
         st.markdown("*Vous cherchez quelqu'un pour jouer ? Postez ici !*")
         
@@ -285,18 +459,23 @@ try:
             username = st.text_input("Votre Nom :", placeholder="Entrez votre nom")
             bar_choice = st.selectbox("Bar :", ["N'importe quel Bar"] + gdf_bar['Nom'].sort_values().tolist())
             
-            if not st.session_state.games_data.empty:
-                game_choice = st.selectbox("Jeu :", ["N'importe quel Jeu"] + sorted(st.session_state.games_data['game'].unique()))
+            game_input_type = st.radio("Comment voulez-vous entrer le jeu ?", ["Taper le nom", "Sélectionner dans la liste"])
+            
+            if game_input_type == "Taper le nom":
+                game_choice = st.text_input("Jeu :", placeholder="Tapez le nom du jeu")
             else:
-                game_choice = st.text_input("Jeu :", placeholder="Entrez le nom du jeu")
+                if not st.session_state.games_data.empty:
+                    game_choice = st.selectbox("Jeu :", ["N'importe quel Jeu"] + sorted(st.session_state.games_data['game'].unique()))
+                else:
+                    game_choice = st.text_input("Jeu :", placeholder="Tapez le nom du jeu")
             
             date_time = st.text_input("Quand :", placeholder="ex: Demain 19h, Ce samedi")
-            message = st.text_area("Message :", placeholder="Salut ! Je cherche quelqu'un pour jouer aux échecs ce week-end...")
+            message = st.text_area("Message :", placeholder="Votre message...")
             
             submitted = st.form_submit_button("📤 Publier")
             
             if submitted:
-                if username and message:
+                if username and message and game_choice:
                     post = {
                         'username': username,
                         'bar': bar_choice,
@@ -306,15 +485,13 @@ try:
                         'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M")
                     }
                     st.session_state.forum_posts.insert(0, post)
-                    save_forum_comment(post)  # Sauvegarder dans le CSV
+                    save_forum_comment(post)
                     st.success("✅ Post créé !")
                     st.rerun()
                 else:
-                    st.error("Veuillez remplir votre nom et votre message !")
+                    st.error("Veuillez remplir votre nom, votre message et le jeu !")
         
         st.markdown("---")
-        
-        # Afficher les posts
         st.markdown("**Posts Récents**")
         
         if len(st.session_state.forum_posts) == 0:
@@ -326,13 +503,12 @@ try:
                     with col1:
                         st.markdown(f"**{post['username']}** • {post['timestamp']}")
                         st.markdown(f"🎮 {post['game']} @ 📍 {post['bar']}")
-                        if post['when']:
+                        if post.get('when'):
                             st.markdown(f"🕐 {post['when']}")
                         st.markdown(f"{post['message']}")
                     with col2:
                         if st.button("🗑️", key=f"delete_{idx}"):
                             st.session_state.forum_posts.pop(idx)
-                            # Resauvegarder tous les posts dans le CSV
                             try:
                                 df = pd.DataFrame(st.session_state.forum_posts)
                                 df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
@@ -340,13 +516,57 @@ try:
                                 pass
                             st.rerun()
                     st.markdown("---")
+    
+    # ONGLET 4: Admin (SEULEMENT SI CONNECTÉ)
+    if st.session_state.admin_logged_in:
+        with tab4:
+            st.subheader("🔧 Interface Administrateur")
+            st.markdown("*Gérez les demandes d'ajout de jeux*")
+            
+            status_filter = st.selectbox("Filtrer par statut :", ["Tous", "En attente", "Approuvé", "Rejeté"])
+            
+            filtered_requests = st.session_state.game_requests.copy()
+            if status_filter == "En attente":
+                filtered_requests = [r for r in filtered_requests if r['status'] == 'pending']
+            elif status_filter == "Approuvé":
+                filtered_requests = [r for r in filtered_requests if r['status'] == 'approved']
+            elif status_filter == "Rejeté":
+                filtered_requests = [r for r in filtered_requests if r['status'] == 'rejected']
+            
+            st.markdown(f"**{len(filtered_requests)} requête(s)**")
+            st.markdown("---")
+            
+            for idx, request in enumerate(filtered_requests):
+                real_idx = st.session_state.game_requests.index(request)
+                
+                with st.expander(f"{'🔵' if request['status'] == 'pending' else '✅' if request['status'] == 'approved' else '❌'} {request['game_name']} @ {request['bar_name']}"):
+                    col1, col2 = st.columns([3, 1])
+                    
+                    with col1:
+                        st.write(f"**Date :** {request['timestamp']}")
+                        st.write(f"**Utilisateur :** {request['username']}")
+                        st.write(f"**Bar :** {request['bar_name']}")
+                        st.write(f"**Jeu :** {request['game_name']}")
+                        st.write(f"**Type :** {request['action_type']}")
+                        if request['description']:
+                            st.write(f"**Description :** {request['description']}")
+                        st.write(f"**Statut :** {request['status']}")
+                    
+                    with col2:
+                        if request['status'] == 'pending':
+                            if st.button("✅", key=f"approve_{real_idx}"):
+                                approve_game_request(real_idx)
+                                st.success("Approuvé !")
+                                st.rerun()
+                            
+                            if st.button("❌", key=f"reject_{real_idx}"):
+                                reject_game_request(real_idx)
+                                st.rerun()
 
 except FileNotFoundError:
-    st.error("⚠️ Impossible de charger le fichier liste_bar_OK.geojson. Assurez-vous que le chemin du fichier est correct.")
-    st.info("Mettez à jour le chemin du fichier dans le code pour pointer vers votre fichier GeoJSON.")
+    st.error("⚠️ Fichier liste_bar_OK.geojson introuvable.")
 except Exception as e:
-    st.error(f"⚠️ Une erreur s'est produite : {str(e)}")
-    st.info("Assurez-vous d'avoir les packages requis installés : streamlit, pandas, geopandas")
+    st.error(f"⚠️ Erreur : {str(e)}")
 
 # Pied de page
 st.markdown("---")
