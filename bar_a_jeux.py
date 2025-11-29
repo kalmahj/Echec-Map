@@ -410,7 +410,7 @@ try:
                     st.session_state.show_games[bar_id] = False
                 
                 # Toggle button
-                if st.button(f"📍 {bar} ({len(games)} jeux)", key=f"toggle_{bar_id}"):
+                if st.button(f"{bar} ({len(games)} jeux)", key=f"toggle_{bar_id}"):
                     st.session_state.show_games[bar_id] = not st.session_state.show_games[bar_id]
                 
                 # Show games if toggled
@@ -543,11 +543,21 @@ try:
                 
                 with col2:
                     if not post.get('reported', False):
-                        with st.expander("🚩 Signaler"):
+                        # Initialize report form state for this post if needed
+                        if f"show_report_{idx}" not in st.session_state:
+                            st.session_state[f"show_report_{idx}"] = False
+                        
+                        # Toggle button
+                        if st.button("🚩 Signaler", key=f"toggle_report_{idx}"):
+                            st.session_state[f"show_report_{idx}"] = not st.session_state[f"show_report_{idx}"]
+                        
+                        # Show form if toggled
+                        if st.session_state[f"show_report_{idx}"]:
                             with st.form(f"report_form_{idx}"):
                                 reason = st.text_input("Raison :")
                                 if st.form_submit_button("Envoyer"):
                                     report_forum_post(idx, reason)
+                                    st.session_state[f"show_report_{idx}"] = False # Close form
                                     st.success("Signalé à l'admin")
                                     st.rerun()
                 
