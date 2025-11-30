@@ -213,6 +213,23 @@ def save_game_request(request):
 
     return []
 
+def add_reaction(post_idx, emoji):
+    """Add a reaction to a post"""
+    if 'reactions' not in st.session_state.forum_posts[post_idx]:
+        st.session_state.forum_posts[post_idx]['reactions'] = {}
+    
+    reactions = st.session_state.forum_posts[post_idx]['reactions']
+    if isinstance(reactions, str):
+        try:
+            reactions = json.loads(reactions)
+        except:
+            reactions = {}
+    
+    reactions[emoji] = reactions.get(emoji, 0) + 1
+    st.session_state.forum_posts[post_idx]['reactions'] = json.dumps(reactions)
+    save_forum_comment(None)
+
+
 # Load data
 if len(st.session_state.forum_posts) == 0:
     st.session_state.forum_posts = load_forum_comments()
@@ -380,7 +397,22 @@ try:
                     icon=folium.Icon(color="blue", icon="glass", prefix="fa")
                 ).add_to(m)
             
-            st_folium(m, width="100%", height=600)
+            # Capture map interactions
+            map_output = st_folium(m, width="100%", height=600, key="folium_map")
+            
+            # Update filter based on marker click
+            if map_output and map_output.get("last_object_clicked"):
+                clicked_lat = map_output["last_object_clicked"].get("lat")
+                clicked_lng = map_output["last_object_clicked"].get("lng")
+                
+                if clicked_lat and clicked_lng:
+                    # Find the bar that was clicked
+                    for idx, row in map_data.iterrows():
+                        if abs(row['lat'] - clicked_lat) < 0.0001 and abs(row['lon'] - clicked_lng) < 0.0001:
+                            # Update the displayed info to show only this bar
+                            filtered_gdf = map_data[map_data['Nom'] == row['Nom']]
+                            has_filter = True
+                            break
 
     # TAB 2: Games
     with tab2:
