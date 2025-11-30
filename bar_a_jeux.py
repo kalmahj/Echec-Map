@@ -10,6 +10,8 @@ import os
 import chardet
 import subprocess
 import json
+import folium
+from streamlit_folium import st_folium
 
 # Page config
 st.set_page_config(page_title="Echec et Map", page_icon="🎮", layout="wide")
@@ -60,32 +62,18 @@ st.markdown("""
         border-radius: 0 8px 8px 0;
     }
     .comment-header {
-        font-size: 0.9em;
-        color: #666;
-        margin-bottom: 4px;
         display: flex;
         justify-content: space-between;
+        margin-bottom: 5px;
+        font-size: 0.9em;
+        color: #666;
     }
     .comment-author {
         font-weight: bold;
-        color: #003366;
+        color: #0066CC;
     }
-    .comment-text {
-        color: #333;
-    }
-    
-    .admin-btn {position: fixed; top: 70px; right: 20px; z-index: 999;}
-    .admin-btn button {font-size: 16px !important; padding: 5px 10px !important;}
 </style>
 """, unsafe_allow_html=True)
-
-# Session state
-if 'forum_posts' not in st.session_state:
-    st.session_state.forum_posts = []
-if 'games_data' not in st.session_state:
-    st.session_state.games_data = pd.DataFrame(columns=['bar_name', 'game'])
-if 'game_requests' not in st.session_state:
-    st.session_state.game_requests = []
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
 if 'show_admin_panel' not in st.session_state:
@@ -224,23 +212,14 @@ if len(st.session_state.forum_posts) == 0:
 
 if st.session_state.games_data.empty:
     st.session_state.games_data = load_games_from_csv()
-
 if len(st.session_state.game_requests) == 0:
     st.session_state.game_requests = load_game_requests()
-
-# Discreet Admin Button (small emoji)
-st.markdown("""<style>
-.admin-btn {position: fixed; top: 70px; right: 20px; z-index: 999;}
-.admin-btn button {font-size: 16px !important; padding: 5px 10px !important;}
-</style>""", unsafe_allow_html=True)
 
 col_header1, col_header2 = st.columns([20, 1])
 with col_header2:
     if st.button("🔧"):
         st.session_state.show_admin_panel = not st.session_state.show_admin_panel
 
-# Admin Panel
-if st.session_state.show_admin_panel:
     st.markdown("---")
     st.markdown("### 🔐 Accès Administrateur")
     if not st.session_state.admin_logged_in:
@@ -287,7 +266,7 @@ try:
     else:
         tab1, tab2, tab3 = st.tabs(["🗺️ Carte", "🎮 Liste de jeux", "💬 Forum"])
     
-    # TAB 1: Map
+    # TAB 1: Map (Folium)
     with tab1:
         col1, col2 = st.columns([2, 1])
         
@@ -347,16 +326,41 @@ try:
                 st.warning("Aucun bar")
         
         with col1:
-            st.subheader("🗺️ Carte")
+            st.subheader("🗺️ Carte Interactive")
             
             # Map point selection
-            st.info("💡 Sélectionnez un bar dans le menu pour voir ses détails")
-            
             if has_filter and len(filtered_gdf) > 0:
-                st.map(filtered_gdf[['lat', 'lon']])
+                map_data = filtered_gdf
             else:
-                st.map(gdf_bar[['lat', 'lon']])
-    
+                map_data = gdf_bar
+            
+            # Center map
+            center_lat = map_data['lat'].mean()
+            center_lon = map_data['lon'].mean()
+            
+            m = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB dark_matter")
+            
+            for idx, row in map_data.iterrows():
+                bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == row['Nom']]
+                game_count = len(bar_games)
+                
+                popup_html = f"""
+                <div style="font-family: 'Corbel', sans-serif; min-width: 200px;">
+                    <h4 style="color: #1E90FF; margin-bottom: 5px;">{row['Nom']}</h4>
+                    <p style="margin: 2px 0;"><b>Adresse:</b> {row['Adresse']}</p>
+                    <p style="margin: 2px 0;"><b>Jeux:</b> {game_count}</p>
+                </div>
+                """
+                
+                folium.Marker(
+                    [row['lat'], row['lon']],
+                    popup=folium.Popup(popup_html, max_width=300),
+                    tooltip=row['Nom'],
+                    icon=folium.Icon(color="blue", icon="glass", prefix="fa")
+                ).add_to(m)
+            
+            st_folium(m, width="100%", height=600)
+
     # TAB 2: Games
     with tab2:
         st.subheader("🎮 Liste des Jeux")
