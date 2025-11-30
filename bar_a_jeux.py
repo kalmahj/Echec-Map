@@ -80,6 +80,12 @@ if 'show_admin_panel' not in st.session_state:
     st.session_state.show_admin_panel = False
 if 'show_games' not in st.session_state:
     st.session_state.show_games = {}
+if 'forum_posts' not in st.session_state:
+    st.session_state.forum_posts = []
+if 'game_requests' not in st.session_state:
+    st.session_state.game_requests = []
+if 'games_data' not in st.session_state:
+    st.session_state.games_data = pd.DataFrame()
 
 # File paths
 FORUM_CSV_PATH = os.path.join(os.path.dirname(__file__), 'forum_comments.csv')
