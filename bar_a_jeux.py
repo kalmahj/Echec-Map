@@ -198,6 +198,19 @@ def load_forum_comments():
             return df.to_dict('records')
         except:
             return []
+
+def save_forum_comment(comment):
+    """Save a forum comment to CSV and auto-commit"""
+    df = pd.DataFrame(st.session_state.forum_posts)
+    df.to_csv(FORUM_CSV_PATH, index=False, encoding='utf-8')
+    auto_commit_csv()
+
+def save_game_request(request):
+    """Save a game request to CSV and auto-commit"""
+    df = pd.DataFrame(st.session_state.game_requests)
+    df.to_csv(GAME_REQUESTS_CSV_PATH, index=False, encoding='utf-8')
+    auto_commit_csv()
+
     return []
 
 # Load data
