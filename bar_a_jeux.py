@@ -226,6 +226,8 @@ with col_header2:
     if st.button("🔧"):
         st.session_state.show_admin_panel = not st.session_state.show_admin_panel
 
+# Admin Panel - display in full width when activated
+if st.session_state.show_admin_panel:
     st.markdown("---")
     st.markdown("### 🔐 Accès Administrateur")
     if not st.session_state.admin_logged_in:
