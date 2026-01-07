@@ -4,5 +4,11 @@
         "password": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
         "icon": "",
         "role": "admin"
+    },
+    {
+        "username": "kalma_j",
+        "password": "d53d8d0632cd64e595b2cc9709bd580e4d323cd65ebbfaa778b3252c761ba1b8",
+        "icon": "icone_joueurs\\icone_joueurs\\icone_4.png",
+        "role": "user"
     }
 ]
