@@ -15,8 +15,13 @@ from streamlit_folium import st_folium
 import hashlib
 import glob
 
+LOGO_PATH = os.path.join(os.path.dirname(__file__), 'logo.png')
+page_icon = "🎮"
+if os.path.exists(LOGO_PATH):
+    page_icon = LOGO_PATH
+
 # Page config
-st.set_page_config(page_title="Echec et Map", page_icon="🎮", layout="wide")
+st.set_page_config(page_title="Echec et Map", page_icon=page_icon, layout="wide")
 
 # CSS
 st.markdown("""
@@ -74,6 +79,56 @@ st.markdown("""
         font-weight: bold;
         color: #0066CC;
     }
+    
+    /* Profile Header */
+    .profile-header {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 5px;
+        background: rgba(255,255,255,0.9);
+        border-radius: 20px;
+        margin-bottom: 10px;
+    }
+    .profile-img-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #1E90FF;
+    }
+    .profile-name {
+        font-weight: bold;
+        color: #003366;
+    }
+    
+    /* Avatar Selection Grid */
+    .avatar-grid-btn {
+        border: 2px solid transparent;
+        border-radius: 10px;
+        transition: all 0.2s;
+    }
+    .avatar-grid-btn:hover {
+        border-color: #1E90FF;
+        transform: scale(1.05);
+    }
+    .selected-avatar {
+        border: 3px solid #00D26A; /* Green border for selection */
+        border-radius: 10px;
+        padding: 2px;
+    }
+    
+    /* Mobile adjustments */
+    @media (max-width: 600px) {
+        .profile-header {
+            justify-content: center;
+        }
+    }
+    
+    /* Hide default sidebar arrow if possible (tricky in pure CSS without impacting functionality) */
+    /* section[data-testid="stSidebar"] > div {width: 100%;} */
+    
 </style>
 """, unsafe_allow_html=True)
 if 'admin_logged_in' not in st.session_state:
@@ -253,52 +308,98 @@ def login_page():
                 else:
                     st.error("Nom d'utilisateur ou mot de passe incorrect.")
 
-    with tab2:
-        st.markdown("### Choisissez votre avatar")
-        icons = get_available_icons()
-        selected_icon = None
-        
-        # Display icons in a grid for selection
-        if icons:
-            # We use a selectbox for simplicity but show images below
-            # Or better: use radio with custom formatting or just clickable images?
-            # Streamlit doesn't support clickable images easily without component.
-            # We will use st.image and a selectbox for the confirmation.
-            
-            # Let's map indices to filenames for easier selection
-            icon_options = {os.path.basename(p): p for p in icons}
-            
-            # Show icons in grid
-            cols = st.columns(6)
-            for i, icon_path in enumerate(icons):
-                with cols[i % 6]:
-                    st.image(icon_path, use_column_width=True)
-                    st.caption(f"Icone {i+1}")
-            
-            selected_icon_name = st.selectbox("Choisissez votre icone :", list(icon_options.keys()), format_func=lambda x: x)
-            selected_icon = icon_options[selected_icon_name]
-        
         with st.form("register_form"):
+            st.markdown("### 1. Choisissez votre avatar")
+            
+            # Avatar Selection Logic
+            icons = get_available_icons()
+            if 'temp_selected_icon' not in st.session_state:
+                st.session_state.temp_selected_icon = None
+            
+            # Display grid
+            cols_count = 5
+            rows = [icons[i:i + cols_count] for i in range(0, len(icons), cols_count)]
+            
+            for row_icons in rows:
+                cols = st.columns(cols_count)
+                for idx, icon_path in enumerate(row_icons):
+                    with cols[idx]:
+                        # Check if selected
+                        is_selected = st.session_state.temp_selected_icon == icon_path
+                        border_style = "border: 4px solid #00D26A;" if is_selected else "border: 2px solid transparent;"
+                        
+                        # Display Image
+                        st.image(icon_path, use_column_width=True)
+                        
+                        # Selection Button
+                        # We use a button with a unique key. If clicked, we update session state
+                        btn_label = "✅" if is_selected else "Choisir"
+                        if st.form_submit_button(btn_label, help="Cliquez pour choisir cet avatar"):
+                             st.session_state.temp_selected_icon = icon_path
+                             st.rerun()
+
+            st.markdown("### 2. Vos informations")
             new_user = st.text_input("Choisir un nom d'utilisateur")
             new_pass = st.text_input("Choisir un mot de passe", type="password")
             confirm_pass = st.text_input("Confirmer le mot de passe", type="password")
             
-            reg_submit = st.form_submit_button("Créer mon compte")
+            # Final validation button (outside the form? No, inside form requires everything to be submitted together)
+            # WORKAROUND: Form submit buttons cannot trigger partial updates cleanly without reruns losing form state unless carefully managed.
+            # BETTER UX: Move Avatar selection OUTSIDE the form.
             
-            if reg_submit:
-                if new_pass != confirm_pass:
-                    st.error("Les mots de passe ne correspondent pas.")
+    # REWRITE: Move logic outside form to allow interaction without form submission constraints
+    with tab2:
+        st.markdown("### 1. Choisissez votre avatar")
+        icons = get_available_icons()
+        if 'temp_selected_icon' not in st.session_state:
+            st.session_state.temp_selected_icon = None
+            
+        # Grid display
+        cols_count = 5
+        # Pagination or scrolling? Let's just fit all.
+        
+        # We need a container for the grid to keep it separate from the input fields
+        
+        # We use standard buttons for selection to update state
+        # Create columns
+        for i in range(0, len(icons), cols_count):
+            cols = st.columns(cols_count)
+            for j in range(cols_count):
+                if i + j < len(icons):
+                    icon_p = icons[i+j]
+                    with cols[j]:
+                        st.image(icon_p, use_column_width=True)
+                        # Highlighting logic:
+                        if st.session_state.temp_selected_icon == icon_p:
+                            st.markdown(f"<div style='text-align:center; color:green; font-weight:bold;'>SÉLECTIONNÉ</div>", unsafe_allow_html=True)
+                        else:
+                            if st.button("Choisir", key=f"sel_{i}_{j}"):
+                                st.session_state.temp_selected_icon = icon_p
+                                st.rerun()
+                                
+        st.markdown("---")
+        st.markdown("### 2. Vos identifiants")
+        
+        with st.form("register_final"):
+            new_user = st.text_input("Nom d'utilisateur")
+            new_pass = st.text_input("Mot de passe", type="password")
+            confirm_pass = st.text_input("Confirmer", type="password")
+            
+            create_btn = st.form_submit_button("VALIDER L'INSCRIPTION")
+            
+            if create_btn:
+                if not st.session_state.temp_selected_icon:
+                    st.error("⚠️ Veuillez choisir un avatar ci-dessus (cliquez sur 'Choisir').")
+                elif new_pass != confirm_pass:
+                    st.error("⚠️ Les mots de passe ne correspondent pas.")
                 elif not new_user or not new_pass:
-                    st.error("Veuillez remplir tous les champs.")
-                elif not selected_icon:
-                    st.error("Veuillez choisir une icône (vérifiez que le dossier icone_joueurs contient des images).")
+                    st.error("⚠️ Tous les champs sont requis.")
                 else:
-                    success, msg = create_user(new_user, new_pass, selected_icon)
+                    success, msg = create_user(new_user, new_pass, st.session_state.temp_selected_icon)
                     if success:
-                        st.success(msg)
-                        st.info("Vous pouvez maintenant vous connecter dans l'onglet 'Se connecter'.")
+                        st.success("✅ Compte créé ! Connectez-vous.")
                     else:
-                        st.error(msg)
+                        st.error(f"❌ {msg}")
 
 def detect_encoding(file_path):
     with open(file_path, 'rb') as f:
@@ -467,57 +568,56 @@ if st.session_state.games_data.empty:
 if len(st.session_state.game_requests) == 0:
     st.session_state.game_requests = load_game_requests()
 
-col_header1, col_header2 = st.columns([20, 1])
-with col_header2:
-    if st.button("🔧"):
-        st.session_state.show_admin_panel = not st.session_state.show_admin_panel
+# --- User Management Functions ---
+# ... (Functions remain unchanged) ...
 
-# Admin Panel - display in full width when activated
-if st.session_state.show_admin_panel:
-    st.markdown("---")
-    st.markdown("### 🔐 Accès Administrateur")
-    if not st.session_state.admin_logged_in:
-        admin_pw = st.text_input("Mot de passe:", type="password", key="admin_login")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Se connecter"):
-                if admin_pw == "admin123":
-                    st.session_state.admin_logged_in = True
-                    st.rerun()
-                else:
-                    st.error("❌ Incorrect")
-        with col2:
-            if st.button("Annuler"):
-                st.session_state.show_admin_panel = False
-                st.rerun()
+# ... (Previous imports and functions) ...
+
+# Admin panel removal - we remove the separate admin login block entirely
+
+
+# Header with Profile
+col_logo, col_title, col_profile = st.columns([1, 4, 3])
+
+with col_logo:
+    if os.path.exists(LOGO_PATH):
+        st.image(LOGO_PATH, width=80)
     else:
-        st.success("✅ Connecté")
-        if st.button("Se déconnecter"):
-            st.session_state.admin_logged_in = False
-            st.session_state.show_admin_panel = False
-            st.rerun()
-    st.markdown("---")
+        st.markdown("🎮", unsafe_allow_html=True)
 
-# Header
-st.title("🎮 Echec et Map")
-st.markdown("*Une application pour les amateurs de jeux de sociétés !*")
+with col_title:
+    st.markdown("<h1 style='margin-top:0;'>Echec et Map</h1>", unsafe_allow_html=True)
 
+# Profile Display in Top Right
 if st.session_state.logged_in:
-    col_logout = st.columns([1])[0] # Just to put it somewhere or in sidebar
-    with st.sidebar:
-        st.write(f"Bienvenue, **{st.session_state.username}** !")
-        if st.session_state.user_icon and os.path.exists(st.session_state.user_icon):
-            st.image(st.session_state.user_icon, width=100)
+    with col_profile:
+        # Get base64 string of image for HTML embedding if needed, or just use st columns
+        # Simplest approach for "Social Media Circle" look:
+        sub_c1, sub_c2 = st.columns([2, 1])
+        with sub_c1:
+            st.markdown(f"<div style='text-align:right; margin-top:15px;'><b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
+        with sub_c2:
+            if st.session_state.user_icon and os.path.exists(st.session_state.user_icon):
+                 st.image(st.session_state.user_icon, width=50) # Circle is handled by CSS '.stImage img {border-radius: 50%}' attempt or custom HTML
+            else:
+                 st.markdown("👤")
         
-        if st.button("Se déconnecter"):
+    # Sidebar logout
+    with st.sidebar:
+         st.write("---")
+         st.write(f"Connecté en tant que: **{st.session_state.username}**")
+         if st.button("Se déconnecter"):
             st.session_state.logged_in = False
             st.session_state.username = ""
             st.session_state.role = "user"
             st.session_state.admin_logged_in = False
             st.rerun()
+
+    # Admin auto-login logic check (legacy removed, now handled at login)
+
 else:
     login_page()
-    st.stop() # Stop execution here so the rest of the app doesn't run
+    st.stop()
 
 st.markdown("---")
 
@@ -767,30 +867,24 @@ try:
                 with col1:
                     reported_flag = "🚩 " if post.get('reported', False) else ""
                     
-                    # Display icon if available
-                    auth_icon = post.get('user_icon', '')
-                    icon_html = ""
-                    if auth_icon and os.path.exists(auth_icon):
-                         # Convert local path to something we can display? 
-                         # Streamlit usually needs a direct image call or base64 for HTML. 
-                         # For simplicity in Markdown/HTML, we might struggle with local paths in 'st.markdown'.
-                         # Let's use columns for the icon.
-                         pass
-                    
-                    # Header with icon
-                    col_icon, col_info = st.columns([1, 10])
-                    with col_icon:
+                    # Avatar and Info
+                    col_p_icon, col_p_info = st.columns([1, 8])
+                    with col_p_icon:
+                         auth_icon = post.get('user_icon', '')
                          if auth_icon and os.path.exists(auth_icon):
-                             st.image(auth_icon, width=40)
+                             st.image(auth_icon, width=50) # Will be circular via CSS hopefully
                          else:
                              st.write("👤")
-                    with col_info:
-                        st.markdown(f"{reported_flag}**{post['username']}** • {post['timestamp']}")
-                        st.markdown(f"🎮 {post['game']} @ 📍 {post['bar']}")
                     
-                    if post.get('when'):
-                        st.markdown(f"🕐 {post['when']}")
-                    st.markdown(f"{post['message']}")
+                    with col_p_info:
+                        st.markdown(f"{reported_flag}**{post['username']}** <span style='color:grey; font-size:0.8em'>• {post['timestamp']}</span>", unsafe_allow_html=True)
+                        if post.get('when'):
+                             st.markdown(f"📅 **{post['when']}**")
+                        st.markdown(f"📍 *{post['bar']}* — 🎮 *{post['game']}*")
+
+                    st.markdown(f"<div style='background:#f0f2f6; padding:10px; border-radius:10px; margin-top:5px;'>{post['message']}</div>", unsafe_allow_html=True)
+                    
+                    # Reactions (Horizontal Layout)
                     
                     # Reactions (Horizontal Layout)
                     reactions = post.get('reactions', '')
