@@ -22,7 +22,7 @@ if os.path.exists(LOGO_PATH):
     page_icon = LOGO_PATH
 
 # Page config
-st.set_page_config(page_title="Echec et Map", page_icon=page_icon, layout="wide")
+st.set_page_config(page_title="Echec et Map", page_icon=page_icon, layout="wide", initial_sidebar_state="collapsed")
 
 # CSS
 st.markdown("""
@@ -560,75 +560,28 @@ if len(st.session_state.game_requests) == 0:
 # Header with Profile
 # Header with Profile - HTML/CSS Implementation for better mobile Control
 # We use a container to align Logo and Profile
-header_html = ""
+# Header with Profile - Simplified
+col_logo, col_title, col_user = st.columns([1, 3, 2])
 
-# 1. Logo Base64
-logo_b64 = ""
-if os.path.exists(LOGO_PATH):
-    logo_b64 = get_img_as_base64(LOGO_PATH)
-    logo_img_tag = f'<img src="data:image/png;base64,{logo_b64}" style="height:60px; vertical-align:middle; margin-right:15px;">'
-else:
-    logo_img_tag = '<span style="font-size:40px; vertical-align:middle; margin-right:15px;">🎮</span>'
-
-# 2. Profile Base64
-profile_html = ""
-if st.session_state.logged_in:
-    user_icon_path = st.session_state.user_icon
-    icon_b64 = ""
-    if user_icon_path and os.path.exists(user_icon_path):
-        icon_b64 = get_img_as_base64(user_icon_path)
-        # Mobile-friendly profile styling - Image
-        profile_html = f"""
-        <div style="display:flex; align-items:center; background:rgba(255,255,255,0.9); padding:5px 15px; border-radius:30px; border:1px solid #eee; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-            <div style="text-align:right; margin-right:10px; line-height:1.2;">
-                <div style="font-weight:bold; color:#003366; font-size:1rem;">{st.session_state.username}</div>
-                <div style="font-size:0.8rem; color:#666;">Membre</div>
-            </div>
-            <img src="data:image/png;base64,{icon_b64}" style="width:45px; height:45px; border-radius:50%; object-fit:cover; border:2px solid #1E90FF;">
-        </div>
-        """
+with col_logo:
+    if os.path.exists(LOGO_PATH):
+        st.image(LOGO_PATH, width=80)
     else:
-        # Netflix-style Fallback: Colored Circle with Initial
-        initial = st.session_state.username[0].upper() if st.session_state.username else "?"
-        profile_html = f"""
-        <div style="display:flex; align-items:center; background:rgba(255,255,255,0.9); padding:5px 15px; border-radius:30px; border:1px solid #eee; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-            <div style="text-align:right; margin-right:10px; line-height:1.2;">
-                <div style="font-weight:bold; color:#003366; font-size:1rem;">{st.session_state.username}</div>
-                <div style="font-size:0.8rem; color:#666;">Membre</div>
-            </div>
-            <div style="width:45px; height:45px; border-radius:50%; background-color:#E50914; color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:1.2rem; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
-                {initial}
-            </div>
-        </div>
-        """
+        st.markdown("<h1>🎮</h1>", unsafe_allow_html=True)
 
-    # Sidebar Logout
-    with st.sidebar:
-        st.write("---")
-        st.write(f"Connecté: **{st.session_state.username}**")
-        if st.button("Se déconnecter"):
-            st.session_state.logged_in = False
-            st.session_state.username = ""
-            st.session_state.role = "user"
-            st.session_state.admin_logged_in = False
-            st.rerun()
+with col_title:
+    st.markdown("<h1 style='margin-top: 0; padding-top: 10px;'>Echec et Map</h1>", unsafe_allow_html=True)
 
-elif not st.session_state.logged_in:
-    login_page()
-    st.stop()
-
-# Combine into a Flex Header
-st.markdown(f"""
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
-    <div style="display:flex; align-items:center;">
-        {logo_img_tag}
-        <h1 style="margin:0; font-family:'Rockwell', serif; color:#003366; font-size:clamp(1.5rem, 4vw, 2.5rem);">Echec et Map</h1>
-    </div>
-    <div>
-        {profile_html}
-    </div>
-</div>
-""", unsafe_allow_html=True)
+with col_user:
+    if st.session_state.logged_in:
+        st.markdown(f"<div style='text-align: right; padding: 10px;'>👤 <b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
+        # Logout button aligned to right via columns or just placed here
+        if st.button("Se déconnecter", key="logout_btn", use_container_width=True):
+             st.session_state.logged_in = False
+             st.session_state.username = ""
+             st.session_state.role = "user"
+             st.session_state.admin_logged_in = False
+             st.rerun()
 
 st.markdown("---")
 
