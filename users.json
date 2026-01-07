@@ -10,5 +10,11 @@
         "password": "d53d8d0632cd64e595b2cc9709bd580e4d323cd65ebbfaa778b3252c761ba1b8",
         "icon": "icone_joueurs\\icone_joueurs\\icone_4.png",
         "role": "user"
+    },
+    {
+        "username": "catlover",
+        "password": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+        "icon": "icone_joueurs\\icone_joueurs\\icone_12.png",
+        "role": "user"
     }
 ]
