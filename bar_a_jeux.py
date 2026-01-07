@@ -128,7 +128,9 @@ st.markdown("""
     }
     
     /* Hide default sidebar arrow if possible (tricky in pure CSS without impacting functionality) */
-    /* section[data-testid="stSidebar"] > div {width: 100%;} */
+    [data-testid="stSidebarCollapsedControl"] {
+        display: none !important;
+    }
     
 </style>
 """, unsafe_allow_html=True)
