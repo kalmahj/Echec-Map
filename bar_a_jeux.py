@@ -308,46 +308,7 @@ def login_page():
                 else:
                     st.error("Nom d'utilisateur ou mot de passe incorrect.")
 
-        with st.form("register_form"):
-            st.markdown("### 1. Choisissez votre avatar")
-            
-            # Avatar Selection Logic
-            icons = get_available_icons()
-            if 'temp_selected_icon' not in st.session_state:
-                st.session_state.temp_selected_icon = None
-            
-            # Display grid
-            cols_count = 5
-            rows = [icons[i:i + cols_count] for i in range(0, len(icons), cols_count)]
-            
-            for row_icons in rows:
-                cols = st.columns(cols_count)
-                for idx, icon_path in enumerate(row_icons):
-                    with cols[idx]:
-                        # Check if selected
-                        is_selected = st.session_state.temp_selected_icon == icon_path
-                        border_style = "border: 4px solid #00D26A;" if is_selected else "border: 2px solid transparent;"
-                        
-                        # Display Image
-                        st.image(icon_path, use_column_width=True)
-                        
-                        # Selection Button
-                        # We use a button with a unique key. If clicked, we update session state
-                        btn_label = "✅" if is_selected else "Choisir"
-                        if st.form_submit_button(btn_label, help="Cliquez pour choisir cet avatar"):
-                             st.session_state.temp_selected_icon = icon_path
-                             st.rerun()
 
-            st.markdown("### 2. Vos informations")
-            new_user = st.text_input("Choisir un nom d'utilisateur")
-            new_pass = st.text_input("Choisir un mot de passe", type="password")
-            confirm_pass = st.text_input("Confirmer le mot de passe", type="password")
-            
-            # Final validation button (outside the form? No, inside form requires everything to be submitted together)
-            # WORKAROUND: Form submit buttons cannot trigger partial updates cleanly without reruns losing form state unless carefully managed.
-            # BETTER UX: Move Avatar selection OUTSIDE the form.
-            
-    # REWRITE: Move logic outside form to allow interaction without form submission constraints
     with tab2:
         st.markdown("### 1. Choisissez votre avatar")
         icons = get_available_icons()
@@ -368,7 +329,7 @@ def login_page():
                 if i + j < len(icons):
                     icon_p = icons[i+j]
                     with cols[j]:
-                        st.image(icon_p, use_column_width=True)
+                        st.image(icon_p, use_container_width=True)
                         # Highlighting logic:
                         if st.session_state.temp_selected_icon == icon_p:
                             st.markdown(f"<div style='text-align:center; color:green; font-weight:bold;'>SÉLECTIONNÉ</div>", unsafe_allow_html=True)
