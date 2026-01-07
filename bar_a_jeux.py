@@ -583,6 +583,11 @@ with col_user:
              st.session_state.admin_logged_in = False
              st.rerun()
 
+# Vérification de connexion - afficher login si non connecté
+if not st.session_state.logged_in:
+    login_page()
+    st.stop()
+
 st.markdown("---")
 
 @st.cache_data
