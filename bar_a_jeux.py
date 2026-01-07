@@ -297,7 +297,7 @@ def get_available_icons():
 
 # --- Login / Register Page ---
 def login_page():
-    st.markdown("<h1 style='text-align: center; color: #003366;'>Connexion - </h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #003366;'>Connexion</h1>", unsafe_allow_html=True)
     
     tab1, tab2 = st.tabs(["Se connecter", "Créer un compte"])
     
@@ -317,7 +317,7 @@ def login_page():
                     if st.session_state.role == 'admin':
                         st.session_state.admin_logged_in = True
                         st.session_state.show_admin_panel = True
-                    st.success("Connexion réussie !")
+                    st.success("Connexion réussie ! A vous de jouer !")
                     st.rerun()
                 else:
                     st.error("Nom d'utilisateur ou mot de passe incorrect.")
@@ -574,8 +574,21 @@ with col_title:
 
 with col_user:
     if st.session_state.logged_in:
-        st.markdown(f"<div style='text-align: right; padding: 10px;'>👤 <b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
-        # Logout button aligned to right via columns or just placed here
+        # Créer deux colonnes pour l'avatar et le nom
+        col_avatar, col_name = st.columns([1, 3])
+        
+        with col_avatar:
+            # Afficher l'avatar de l'utilisateur s'il existe
+            user_icon_path = st.session_state.user_icon
+            if user_icon_path and os.path.exists(user_icon_path):
+                st.image(user_icon_path, width=40)
+            else:
+                st.markdown("👤", unsafe_allow_html=True)
+        
+        with col_name:
+            st.markdown(f"<div style='padding-top: 8px;'><b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
+        
+        # Logout button
         if st.button("Se déconnecter", key="logout_btn", use_container_width=True):
              st.session_state.logged_in = False
              st.session_state.username = ""
