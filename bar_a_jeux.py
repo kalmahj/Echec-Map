@@ -14,6 +14,7 @@ import folium
 from streamlit_folium import st_folium
 import hashlib
 import glob
+import base64
 
 LOGO_PATH = os.path.join(os.path.dirname(__file__), 'logo.png')
 page_icon = "🎮"
@@ -283,13 +284,13 @@ def get_available_icons():
 
 # --- Login / Register Page ---
 def login_page():
-    st.markdown("<h1 style='text-align: center; color: #003366;'>🏰 Echec et Map - Connexion</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #003366;'>Connexion - </h1>", unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["🔐 Se connecter", "📝 Créer un compte"])
+    tab1, tab2 = st.tabs(["Se connecter", "Créer un compte"])
     
     with tab1:
         with st.form("login_form"):
-            username = st.text_input("Nom d'utilisateur")
+            username = st.text_input("Utilisateur")
             password = st.text_input("Mot de passe", type="password")
             submit = st.form_submit_button("Se connecter", type="primary")
             
@@ -358,7 +359,7 @@ def login_page():
                 else:
                     success, msg = create_user(new_user, new_pass, st.session_state.temp_selected_icon)
                     if success:
-                        st.success("✅ Compte créé ! Connectez-vous.")
+                        st.success("Compte créé ! Connectez-vous.")
                     else:
                         st.error(f"❌ {msg}")
 
@@ -367,6 +368,11 @@ def detect_encoding(file_path):
         raw_data = f.read(10000)
     result = chardet.detect(raw_data)
     return result['encoding']
+
+def get_img_as_base64(file_path):
+    with open(file_path, "rb") as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
 
 def load_game_requests():
     if os.path.exists(GAME_REQUESTS_CSV_PATH):
@@ -538,47 +544,70 @@ if len(st.session_state.game_requests) == 0:
 
 
 # Header with Profile
-col_logo, col_title, col_profile = st.columns([1, 4, 3])
+# Header with Profile - HTML/CSS Implementation for better mobile Control
+# We use a container to align Logo and Profile
+header_html = ""
 
-with col_logo:
-    if os.path.exists(LOGO_PATH):
-        st.image(LOGO_PATH, width=80)
-    else:
-        st.markdown("🎮", unsafe_allow_html=True)
+# 1. Logo Base64
+logo_b64 = ""
+if os.path.exists(LOGO_PATH):
+    logo_b64 = get_img_as_base64(LOGO_PATH)
+    logo_img_tag = f'<img src="data:image/png;base64,{logo_b64}" style="height:60px; vertical-align:middle; margin-right:15px;">'
+else:
+    logo_img_tag = '<span style="font-size:40px; vertical-align:middle; margin-right:15px;">🎮</span>'
 
-with col_title:
-    st.markdown("<h1 style='margin-top:0;'>Echec et Map</h1>", unsafe_allow_html=True)
-
-# Profile Display in Top Right
+# 2. Profile Base64
+profile_html = ""
 if st.session_state.logged_in:
-    with col_profile:
-        # Get base64 string of image for HTML embedding if needed, or just use st columns
-        # Simplest approach for "Social Media Circle" look:
-        sub_c1, sub_c2 = st.columns([2, 1])
-        with sub_c1:
-            st.markdown(f"<div style='text-align:right; margin-top:15px;'><b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
-        with sub_c2:
-            if st.session_state.user_icon and os.path.exists(st.session_state.user_icon):
-                 st.image(st.session_state.user_icon, width=50) # Circle is handled by CSS '.stImage img {border-radius: 50%}' attempt or custom HTML
-            else:
-                 st.markdown("👤")
-        
-    # Sidebar logout
+    user_icon_path = st.session_state.user_icon
+    icon_b64 = ""
+    if user_icon_path and os.path.exists(user_icon_path):
+        icon_b64 = get_img_as_base64(user_icon_path)
+        # Mobile-friendly profile styling
+        profile_html = f"""
+        <div style="display:flex; align-items:center; background:rgba(255,255,255,0.9); padding:5px 15px; border-radius:30px; border:1px solid #eee; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+            <div style="text-align:right; margin-right:10px; line-height:1.2;">
+                <div style="font-weight:bold; color:#003366; font-size:1rem;">{st.session_state.username}</div>
+                <div style="font-size:0.8rem; color:#666;">Membre</div>
+            </div>
+            <img src="data:image/png;base64,{icon_b64}" style="width:45px; height:45px; border-radius:50%; object-fit:cover; border:2px solid #1E90FF;">
+        </div>
+        """
+    else:
+        profile_html = f"""
+        <div style="display:flex; align-items:center;">
+             <span style="font-weight:bold; margin-right:10px;">{st.session_state.username}</span>
+             <span style="font-size:30px;">👤</span>
+        </div>
+        """
+
+    # Sidebar Logout
     with st.sidebar:
-         st.write("---")
-         st.write(f"Connecté en tant que: **{st.session_state.username}**")
-         if st.button("Se déconnecter"):
+        st.write("---")
+        st.write(f"Connecté: **{st.session_state.username}**")
+        if st.button("Se déconnecter"):
             st.session_state.logged_in = False
             st.session_state.username = ""
             st.session_state.role = "user"
             st.session_state.admin_logged_in = False
             st.rerun()
 
-    # Admin auto-login logic check (legacy removed, now handled at login)
-
-else:
+elif not st.session_state.logged_in:
     login_page()
     st.stop()
+
+# Combine into a Flex Header
+st.markdown(f"""
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
+    <div style="display:flex; align-items:center;">
+        {logo_img_tag}
+        <h1 style="margin:0; font-family:'Rockwell', serif; color:#003366; font-size:clamp(1.5rem, 4vw, 2.5rem);">Echec et Map</h1>
+    </div>
+    <div>
+        {profile_html}
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -601,64 +630,51 @@ try:
     
     # TAB 1: Map (Folium)
     with tab1:
-        col1, col2 = st.columns([2, 1])
+        # 1. Search Filters on TOP
+        with st.container():
+            st.markdown("### 🔍 Recherche")
+            col_f1, col_f2, col_f3 = st.columns(3)
+            
+            with col_f1:
+                bar_options = ["Tous"] + sorted(gdf_bar['Nom'].tolist())
+                selected_bar = st.selectbox("📍 Bar :", bar_options)
+            
+            with col_f2:
+                arrondissements = sorted(gdf_bar['Arrondissement'].dropna().unique(), key=lambda x: int(x) if str(x).isdigit() else 999)
+                selected_arrond = st.selectbox("🏙️ Arrondissement :", ["Tous"] + [str(a) for a in arrondissements])
+            
+            with col_f3:
+                if not st.session_state.games_data.empty:
+                    all_games = sorted(st.session_state.games_data['game'].unique())
+                    selected_game = st.selectbox("🎲 Jeu :", ["Tous"] + all_games)
+                else:
+                     st.write("Chargement des jeux...")
+                     selected_game = "Tous"
+
+        st.markdown("---")
+
+        # Logic for filtering
+        filtered_gdf = gdf_bar.copy()
+        has_filter = False
         
-        with col2:
-            st.subheader("🔍 Recherche")
-            
-            bar_options = ["Tous"] + sorted(gdf_bar['Nom'].tolist())
-            selected_bar = st.selectbox("Bar :", bar_options)
-            
-            arrondissements = sorted(gdf_bar['Arrondissement'].dropna().unique(), key=lambda x: int(x) if str(x).isdigit() else 999)
-            selected_arrond = st.selectbox("Arrondissement :", ["Tous"] + [str(a) for a in arrondissements])
-            
-            if not st.session_state.games_data.empty:
-                all_games = sorted(st.session_state.games_data['game'].unique())
-                selected_game = st.selectbox("Jeu :", ["Tous"] + all_games)
-            else:
-                selected_game = "Tous"
-            
-            # Filters
-            filtered_gdf = gdf_bar.copy()
-            has_filter = False
-            
-            if selected_bar != "Tous":
-                filtered_gdf = filtered_gdf[filtered_gdf['Nom'] == selected_bar]
-                has_filter = True
-            
-            if selected_arrond != "Tous":
-                filtered_gdf = filtered_gdf[filtered_gdf['Arrondissement'].astype(str) == selected_arrond]
-                has_filter = True
-            
-            if selected_game != "Tous":
-                bars_with_game = st.session_state.games_data[st.session_state.games_data['game'] == selected_game]['bar_name'].unique()
-                filtered_gdf = filtered_gdf[filtered_gdf['Nom'].isin(bars_with_game)]
-                has_filter = True
-            
-            if has_filter and len(filtered_gdf) > 0:
-                st.info(f"{len(filtered_gdf)} bar(s)")
-                st.markdown("---")
-                for idx, row in filtered_gdf.iterrows():
-                    bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == row['Nom']]
-                    game_count = len(bar_games)
-                    
-                    st.markdown(f"""<div class='bar-box'><h4 style='margin:0; color: #0066CC;'>📍 {row['Nom']}</h4></div>""", unsafe_allow_html=True)
-                    
-                    if pd.notna(row['Adresse']):
-                        st.write(f"**Adresse:** {row['Adresse']}")
-                    if pd.notna(row['Arrondissement']):
-                        st.write(f"**Arr:** {row['Arrondissement']}")
-                    if pd.notna(row['Métro']):
-                        st.write(f"**Métro:** {row['Métro']}")
-                    if pd.notna(row['Téléphone']):
-                        st.write(f"**Tél:** {row['Téléphone']}")
-                    if game_count > 0:
-                        st.write(f"**🎮:** {game_count}")
-                    st.markdown("---")
-            elif has_filter:
-                st.warning("Aucun bar")
+        if selected_bar != "Tous":
+            filtered_gdf = filtered_gdf[filtered_gdf['Nom'] == selected_bar]
+            has_filter = True
         
-        with col1:
+        if selected_arrond != "Tous":
+            filtered_gdf = filtered_gdf[filtered_gdf['Arrondissement'].astype(str) == selected_arrond]
+            has_filter = True
+        
+        if selected_game != "Tous":
+            bars_with_game = st.session_state.games_data[st.session_state.games_data['game'] == selected_game]['bar_name'].unique()
+            filtered_gdf = filtered_gdf[filtered_gdf['Nom'].isin(bars_with_game)]
+            has_filter = True
+
+        # 2. Map and Results Layout
+        # Two columns: Map (Larger) | List (Smaller, scrollable if needed)
+        col_map, col_list = st.columns([2, 1])
+
+        with col_map:
             st.subheader("🗺️ Carte Interactive")
             
             # Map point selection
@@ -668,8 +684,8 @@ try:
                 map_data = gdf_bar
             
             # Center map
-            center_lat = map_data['lat'].mean()
-            center_lon = map_data['lon'].mean()
+            center_lat = map_data['lat'].mean() if len(map_data) > 0 else 48.8566
+            center_lon = map_data['lon'].mean() if len(map_data) > 0 else 2.3522
             
             m = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB dark_matter")
             
@@ -677,11 +693,12 @@ try:
                 bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == row['Nom']]
                 game_count = len(bar_games)
                 
+                # Enhanced Popup
                 popup_html = f"""
-                <div style="font-family: 'Corbel', sans-serif; min-width: 200px;">
-                    <h4 style="color: #1E90FF; margin-bottom: 5px;">{row['Nom']}</h4>
-                    <p style="margin: 2px 0;"><b>Adresse:</b> {row['Adresse']}</p>
-                    <p style="margin: 2px 0;"><b>Jeux:</b> {game_count}</p>
+                <div style="font-family: 'Montserrat', sans-serif; min-width: 200px;">
+                    <h5 style="color: #1E90FF; margin-bottom: 5px; font-weight:bold;">{row['Nom']}</h5>
+                    <p style="margin: 2px 0; font-size:12px;"><b>📍 ADRESSE:</b><br>{row['Adresse']}</p>
+                    <p style="margin: 2px 0; font-size:12px;"><b>🎮 JEUX:</b> {game_count}</p>
                 </div>
                 """
                 
@@ -693,7 +710,7 @@ try:
                 ).add_to(m)
             
             # Capture map interactions
-            map_output = st_folium(m, width="100%", height=600, key="folium_map")
+            map_output = st_folium(m, width="100%", height=500, key="folium_map")
             
             # Update filter based on marker click
             if map_output and map_output.get("last_object_clicked"):
@@ -706,8 +723,32 @@ try:
                         if abs(row['lat'] - clicked_lat) < 0.0001 and abs(row['lon'] - clicked_lng) < 0.0001:
                             # Update the displayed info to show only this bar
                             filtered_gdf = map_data[map_data['Nom'] == row['Nom']]
-                            has_filter = True
+                            has_filter = True # This only affects list below, as map is already rendered
                             break
+
+        with col_list:
+            st.subheader("📍 Résultats")
+            if has_filter and len(filtered_gdf) > 0:
+                st.info(f"{len(filtered_gdf)} Lieu(x) trouvé(s)")
+                
+                for idx, row in filtered_gdf.iterrows():
+                    bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == row['Nom']]
+                    game_count = len(bar_games)
+                    
+                    st.markdown(f"""
+                    <div class='bar-box'>
+                        <h4 style='margin:0; color: #003366; font-size:16px;'>{row['Nom']}</h4>
+                        <div style='font-size:13px; color:#555; margin-top:5px;'>
+                            {f"🚇 {row['Métro']}<br>" if pd.notna(row['Métro']) else ""}
+                            {f"📞 {row['Téléphone']}<br>" if pd.notna(row['Téléphone']) else ""}
+                            🎮 <b>{game_count}</b> jeux disponibles
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            elif has_filter:
+                st.warning("Aucun bar ne correspond à la recherche.")
+            else:
+                st.write("👈 Utilisez la carte ou les filtres pour affiner.")
 
     # TAB 2: Games
     with tab2:
