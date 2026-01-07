@@ -127,9 +127,20 @@ st.markdown("""
         }
     }
     
-    /* Hide default sidebar arrow if possible (tricky in pure CSS without impacting functionality) */
+    /* Force Hide default sidebar arrow - more specific selector */
+    section[data-testid="stSidebar"] > div > div:first-child {
+        display: none !important;
+    }
     [data-testid="stSidebarCollapsedControl"] {
         display: none !important;
+        visibility: hidden !important;
+    }
+    
+    /* Mobile-friendly Grid Buttons */
+    .stButton button {
+        width: 100%;
+        border-radius: 8px;
+        font-weight: bold;
     }
     
 </style>
@@ -319,13 +330,14 @@ def login_page():
             st.session_state.temp_selected_icon = None
             
         # Grid display
-        cols_count = 5
+        cols_count = 3
         # Pagination or scrolling? Let's just fit all.
         
         # We need a container for the grid to keep it separate from the input fields
         
         # We use standard buttons for selection to update state
         # Create columns
+
         for i in range(0, len(icons), cols_count):
             cols = st.columns(cols_count)
             for j in range(cols_count):
@@ -565,7 +577,7 @@ if st.session_state.logged_in:
     icon_b64 = ""
     if user_icon_path and os.path.exists(user_icon_path):
         icon_b64 = get_img_as_base64(user_icon_path)
-        # Mobile-friendly profile styling
+        # Mobile-friendly profile styling - Image
         profile_html = f"""
         <div style="display:flex; align-items:center; background:rgba(255,255,255,0.9); padding:5px 15px; border-radius:30px; border:1px solid #eee; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
             <div style="text-align:right; margin-right:10px; line-height:1.2;">
@@ -576,10 +588,17 @@ if st.session_state.logged_in:
         </div>
         """
     else:
+        # Netflix-style Fallback: Colored Circle with Initial
+        initial = st.session_state.username[0].upper() if st.session_state.username else "?"
         profile_html = f"""
-        <div style="display:flex; align-items:center;">
-             <span style="font-weight:bold; margin-right:10px;">{st.session_state.username}</span>
-             <span style="font-size:30px;">👤</span>
+        <div style="display:flex; align-items:center; background:rgba(255,255,255,0.9); padding:5px 15px; border-radius:30px; border:1px solid #eee; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+            <div style="text-align:right; margin-right:10px; line-height:1.2;">
+                <div style="font-weight:bold; color:#003366; font-size:1rem;">{st.session_state.username}</div>
+                <div style="font-size:0.8rem; color:#666;">Membre</div>
+            </div>
+            <div style="width:45px; height:45px; border-radius:50%; background-color:#E50914; color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:1.2rem; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
+                {initial}
+            </div>
         </div>
         """
 
