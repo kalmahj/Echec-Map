@@ -12,6 +12,8 @@ import subprocess
 import json
 import folium
 from streamlit_folium import st_folium
+import hashlib
+import glob
 
 # Page config
 st.set_page_config(page_title="Echec et Map", page_icon="🎮", layout="wide")
@@ -86,10 +88,20 @@ if 'game_requests' not in st.session_state:
     st.session_state.game_requests = []
 if 'games_data' not in st.session_state:
     st.session_state.games_data = pd.DataFrame()
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'username' not in st.session_state:
+    st.session_state.username = ""
+if 'user_icon' not in st.session_state:
+    st.session_state.user_icon = ""
+if 'role' not in st.session_state:
+    st.session_state.role = "user"
 
 # File paths
+USERS_JSON_PATH = os.path.join(os.path.dirname(__file__), 'users.json')
 FORUM_CSV_PATH = os.path.join(os.path.dirname(__file__), 'forum_comments.csv')
 GAME_REQUESTS_CSV_PATH = os.path.join(os.path.dirname(__file__), 'game_requests.csv')
+ICONS_DIR = os.path.join(os.path.dirname(__file__), 'icone_joueurs', 'icone_joueurs')
 
 BAR_CSV_MAPPING = {
     'liste_jeux_aubonheurdesjeux.csv': 'Au Bonheur des Jeux',
@@ -144,6 +156,149 @@ def auto_commit_csv():
         st.error("⚠️ Git n'est pas installé ou n'est pas dans le PATH.")
     except Exception as e:
         st.error(f"Auto-commit failed: {str(e)}")
+
+# --- User Management Functions ---
+def load_users():
+    if os.path.exists(USERS_JSON_PATH):
+        try:
+            with open(USERS_JSON_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_users(users_list):
+    with open(USERS_JSON_PATH, 'w', encoding='utf-8') as f:
+        json.dump(users_list, f, indent=4, ensure_ascii=False)
+    
+    # Auto-commit users.json
+    repo_dir = os.path.dirname(os.path.abspath(__file__))
+    try:
+        subprocess.run(['git', 'add', 'users.json'], cwd=repo_dir, capture_output=True)
+        subprocess.run(['git', 'commit', '-m', 'Update users'], cwd=repo_dir, capture_output=True)
+    except:
+        pass
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def create_user(username, password, icon_path):
+    users = load_users()
+    if any(u['username'] == username for u in users):
+        return False, "Ce nom d'utilisateur existe déjà."
+    
+    new_user = {
+        'username': username,
+        'password': hash_password(password),
+        'icon': icon_path,
+        'role': 'user' # Default role
+    }
+    users.append(new_user)
+    save_users(users)
+    return True, "Compte créé avec succès !"
+
+def verify_user(username, password):
+    users = load_users()
+    
+    # Check for hardcoded admin first if not in DB (or migration)
+    if username == "admin" and password == "admin123":
+        # Ensure admin exists in DB
+        if not any(u['username'] == 'admin' for u in users):
+            admin_user = {
+                'username': 'admin',
+                'password': hash_password('admin123'),
+                'icon': '',
+                'role': 'admin'
+            }
+            users.append(admin_user)
+            save_users(users)
+        return True, {'username': 'admin', 'role': 'admin', 'icon': ''}
+
+    encoded_pw = hash_password(password)
+    for user in users:
+        if user['username'] == username and user['password'] == encoded_pw:
+            return True, user
+    return False, None
+
+def get_available_icons():
+    if os.path.exists(ICONS_DIR):
+        # List png files
+        return glob.glob(os.path.join(ICONS_DIR, "*.png"))
+    return []
+
+# --- Login / Register Page ---
+def login_page():
+    st.markdown("<h1 style='text-align: center; color: #003366;'>🏰 Echec et Map - Connexion</h1>", unsafe_allow_html=True)
+    
+    tab1, tab2 = st.tabs(["🔐 Se connecter", "📝 Créer un compte"])
+    
+    with tab1:
+        with st.form("login_form"):
+            username = st.text_input("Nom d'utilisateur")
+            password = st.text_input("Mot de passe", type="password")
+            submit = st.form_submit_button("Se connecter", type="primary")
+            
+            if submit:
+                success, user_data = verify_user(username, password)
+                if success:
+                    st.session_state.logged_in = True
+                    st.session_state.username = user_data['username']
+                    st.session_state.role = user_data.get('role', 'user')
+                    st.session_state.user_icon = user_data.get('icon', '')
+                    if st.session_state.role == 'admin':
+                        st.session_state.admin_logged_in = True
+                        st.session_state.show_admin_panel = True
+                    st.success("Connexion réussie !")
+                    st.rerun()
+                else:
+                    st.error("Nom d'utilisateur ou mot de passe incorrect.")
+
+    with tab2:
+        st.markdown("### Choisissez votre avatar")
+        icons = get_available_icons()
+        selected_icon = None
+        
+        # Display icons in a grid for selection
+        if icons:
+            # We use a selectbox for simplicity but show images below
+            # Or better: use radio with custom formatting or just clickable images?
+            # Streamlit doesn't support clickable images easily without component.
+            # We will use st.image and a selectbox for the confirmation.
+            
+            # Let's map indices to filenames for easier selection
+            icon_options = {os.path.basename(p): p for p in icons}
+            
+            # Show icons in grid
+            cols = st.columns(6)
+            for i, icon_path in enumerate(icons):
+                with cols[i % 6]:
+                    st.image(icon_path, use_column_width=True)
+                    st.caption(f"Icone {i+1}")
+            
+            selected_icon_name = st.selectbox("Choisissez votre icone :", list(icon_options.keys()), format_func=lambda x: x)
+            selected_icon = icon_options[selected_icon_name]
+        
+        with st.form("register_form"):
+            new_user = st.text_input("Choisir un nom d'utilisateur")
+            new_pass = st.text_input("Choisir un mot de passe", type="password")
+            confirm_pass = st.text_input("Confirmer le mot de passe", type="password")
+            
+            reg_submit = st.form_submit_button("Créer mon compte")
+            
+            if reg_submit:
+                if new_pass != confirm_pass:
+                    st.error("Les mots de passe ne correspondent pas.")
+                elif not new_user or not new_pass:
+                    st.error("Veuillez remplir tous les champs.")
+                elif not selected_icon:
+                    st.error("Veuillez choisir une icône (vérifiez que le dossier icone_joueurs contient des images).")
+                else:
+                    success, msg = create_user(new_user, new_pass, selected_icon)
+                    if success:
+                        st.success(msg)
+                        st.info("Vous pouvez maintenant vous connecter dans l'onglet 'Se connecter'.")
+                    else:
+                        st.error(msg)
 
 def detect_encoding(file_path):
     with open(file_path, 'rb') as f:
@@ -346,6 +501,24 @@ if st.session_state.show_admin_panel:
 # Header
 st.title("🎮 Echec et Map")
 st.markdown("*Une application pour les amateurs de jeux de sociétés !*")
+
+if st.session_state.logged_in:
+    col_logout = st.columns([1])[0] # Just to put it somewhere or in sidebar
+    with st.sidebar:
+        st.write(f"Bienvenue, **{st.session_state.username}** !")
+        if st.session_state.user_icon and os.path.exists(st.session_state.user_icon):
+            st.image(st.session_state.user_icon, width=100)
+        
+        if st.button("Se déconnecter"):
+            st.session_state.logged_in = False
+            st.session_state.username = ""
+            st.session_state.role = "user"
+            st.session_state.admin_logged_in = False
+            st.rerun()
+else:
+    login_page()
+    st.stop() # Stop execution here so the rest of the app doesn't run
+
 st.markdown("---")
 
 @st.cache_data
@@ -554,16 +727,18 @@ try:
         st.subheader("💬 Forum")
         
         with st.form("new_post"):
-            username = st.text_input("Nom :")
+            # Username is now automatic
+            st.write(f"**Auteur :** {st.session_state.username}")
             bar_choice = st.selectbox("Bar :", ["N'importe quel Bar"] + gdf_bar['Nom'].sort_values().tolist())
             game_choice = st.text_input("Jeu :", placeholder="Tapez le nom du jeu")
             date_time = st.text_input("Quand :", placeholder="ex: Demain 19h")
             message = st.text_area("Message :")
             
             if st.form_submit_button("Publier"):
-                if username and message and game_choice:
+                if message and game_choice:
                     post = {
-                        'username': username,
+                        'username': st.session_state.username,
+                        'user_icon': st.session_state.user_icon, # Store icon path with post
                         'bar': bar_choice,
                         'game': game_choice,
                         'when': date_time,
@@ -591,8 +766,28 @@ try:
                 col1, col2 = st.columns([4, 1])
                 with col1:
                     reported_flag = "🚩 " if post.get('reported', False) else ""
-                    st.markdown(f"{reported_flag}**{post['username']}** • {post['timestamp']}")
-                    st.markdown(f"🎮 {post['game']} @ 📍 {post['bar']}")
+                    
+                    # Display icon if available
+                    auth_icon = post.get('user_icon', '')
+                    icon_html = ""
+                    if auth_icon and os.path.exists(auth_icon):
+                         # Convert local path to something we can display? 
+                         # Streamlit usually needs a direct image call or base64 for HTML. 
+                         # For simplicity in Markdown/HTML, we might struggle with local paths in 'st.markdown'.
+                         # Let's use columns for the icon.
+                         pass
+                    
+                    # Header with icon
+                    col_icon, col_info = st.columns([1, 10])
+                    with col_icon:
+                         if auth_icon and os.path.exists(auth_icon):
+                             st.image(auth_icon, width=40)
+                         else:
+                             st.write("👤")
+                    with col_info:
+                        st.markdown(f"{reported_flag}**{post['username']}** • {post['timestamp']}")
+                        st.markdown(f"🎮 {post['game']} @ 📍 {post['bar']}")
+                    
                     if post.get('when'):
                         st.markdown(f"🕐 {post['when']}")
                     st.markdown(f"{post['message']}")
@@ -663,16 +858,16 @@ try:
                     with st.form(f"comment_{idx}"):
                         col_c1, col_c2 = st.columns([1, 3])
                         with col_c1:
-                            c_author = st.text_input("Nom:", key=f"c_name_{idx}")
+                            st.write(f"👤 {st.session_state.username}")
                         with col_c2:
                             c_text = st.text_input("Commentaire:", key=f"c_text_{idx}")
                             
                         if st.form_submit_button("💬 Commenter"):
-                            if c_author and c_text:
-                                add_comment_to_post(idx, c_author, c_text)
+                            if c_text:
+                                add_comment_to_post(idx, st.session_state.username, c_text)
                                 st.rerun()
                             else:
-                                st.error("Nom et message requis")
+                                st.error("Message requis")
                 
                 with col2:
                     # Post deletion
