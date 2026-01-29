@@ -79,13 +79,31 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] {background-color: #E6F3FF; border-radius: 8px 8px 0 0;}
     .stTabs [aria-selected="true"] {background-color: #1E90FF !important; color: white !important;}
     
-    /* Sticky Navigation */
+    /* Sticky Header & Tabs */
     div[data-testid="stVerticalBlock"] > div:has(div[data-baseweb="tab-list"]) {
         position: sticky;
         top: 0;
         z-index: 999;
         background-color: white;
-        padding-top: 1rem;
+        padding-top: 0.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Scroll Indicator Animation */
+    @keyframes bounce {
+        0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
+        40% {transform: translateY(-10px);}
+        60% {transform: translateY(-5px);}
+    }
+    
+    .scroll-indicator {
+        text-align: center;
+        margin-top: 10px;
+        color: #1E90FF;
+        font-weight: bold;
+        animation: bounce 2s infinite;
+        font-size: 24px;
+        cursor: pointer;
     }
     
     .bar-box {background: #E6F3FF; padding: 10px; border-radius: 8px; margin: 5px 0; cursor: pointer; border: 1px solid #1E90FF;}
@@ -130,7 +148,7 @@ st.markdown("""
         color: #0066CC;
     }
     
-    /* Profile Header */
+    /* Profile Header - Mobile Optimized */
     .profile-header {
         display: flex;
         align-items: center;
@@ -173,6 +191,13 @@ st.markdown("""
     @media (max-width: 600px) {
         .profile-header {
             justify-content: center;
+        }
+        /* Make sure logo/header sticks well */
+        div[data-testid="stVerticalBlock"] > div:has(h1) {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: white;
         }
     }
     
@@ -697,14 +722,29 @@ try:
             filtered_gdf = filtered_gdf[filtered_gdf['Code_postal'].isin(selected_zips)]
             
         # Determine Map Center & Zoom
-        if search_query and search_query in filtered_gdf['Nom'].values:
-            # Zoom to selected bar
-            target_bar = filtered_gdf[filtered_gdf['Nom'] == search_query].iloc[0]
+        # Logic to handle sync: If we came from a map click, we want to update the selectbox index
+        # But selectbox index changes trigger rerun. 
+        # We need to find the index of the currently selected bar in the options list
+        
+        current_selection = st.session_state.get('last_selected_bar', "")
+        try:
+            sel_index = [""] + all_bar_names
+            default_index = sel_index.index(current_selection) if current_selection in sel_index else 0
+        except:
+            default_index = 0
+
+        # Note: We update the selectbox to reflect the state
+        # But we also need to respect if the USER changed the selectbox manually in this run
+        
+        # It's better to let the selectbox key drive the state if changed, or state drive index if rerun from map
+        # But Streamlit selectbox key is tricky with bidirectional sync.
+        # Let's use a callback or just ensure the index param matches the state.
+        
+        # Determine Map Center
+        if current_selection and current_selection in filtered_gdf['Nom'].values:
+            target_bar = filtered_gdf[filtered_gdf['Nom'] == current_selection].iloc[0]
             map_center = [target_bar['lat'], target_bar['lon']]
             map_zoom = 15
-            # Also set this bar as selected in session state if not already
-            if st.session_state.get('last_selected_bar') != search_query:
-                st.session_state['last_selected_bar'] = search_query
         else:
             map_center = [filtered_gdf['lat'].mean(), filtered_gdf['lon'].mean()] if not filtered_gdf.empty else [48.8566, 2.3522]
             map_zoom = 12
@@ -713,12 +753,12 @@ try:
         col_map, col_details = st.columns([2, 1])
         
         with col_map:
-            m = folium.Map(location=map_center, zoom_start=map_zoom, tiles="CartoDB dark_matter")
+            m = folium.Map(location=map_center, zoom_start=map_zoom, tiles="CartoDB dark_matter", scrollWheelZoom=False)
             
             # Add markers
             for idx, row in filtered_gdf.iterrows():
                 # Color logic: Highlight if selected
-                is_selected = (st.session_state.get('last_selected_bar') == row['Nom'])
+                is_selected = (current_selection == row['Nom'])
                 icon_color = "red" if is_selected else "blue"
                 
                 folium.Marker(
@@ -730,11 +770,13 @@ try:
             # Display Map & Capture Returns
             map_return = st_folium(m, width="100%", height=600, key="main_map")
             
+            # Add Scroll Indicator
+            st.markdown('<div class="scroll-indicator">⬇️ Infos & Jeux plus bas ⬇️</div>', unsafe_allow_html=True)
+            
             # Handle Click Events
             if map_return and map_return.get("last_object_clicked"):
                 clicked_pos = map_return["last_object_clicked"]
-                # Find bar with this position (approximate match since floats can vary slightly)
-                # Using a small epsilon for float comparison
+                # Find bar with this position
                 clicked_bar = filtered_gdf[
                     (filtered_gdf['lat'] - clicked_pos['lat']).abs() < 0.0001 & 
                     (filtered_gdf['lon'] - clicked_pos['lng']).abs() < 0.0001
@@ -744,16 +786,17 @@ try:
                     selected_name = clicked_bar.iloc[0]['Nom']
                     if st.session_state.get('last_selected_bar') != selected_name:
                         st.session_state['last_selected_bar'] = selected_name
+                        # Sync with search bar
+                        st.session_state['search_bar_main'] = selected_name
                         st.rerun()
 
         with col_details:
+            # We use the session state directly
             selected_bar_name = st.session_state.get('last_selected_bar')
             
-            # If search query was used, it overrides/updates the selection
-            if search_query and search_query != selected_bar_name:
-                 # logic handled above by map center, but let's ensure consistency
-                 pass 
-
+            # If search query was used (from top), it updates state. 
+            # But here we just read state.
+            
             if selected_bar_name:
                 # Find data
                 bar_match = gdf_bar[gdf_bar['Nom'] == selected_bar_name]
@@ -847,7 +890,7 @@ try:
             center_lat = map_data['lat'].mean() if len(map_data) > 0 else 48.8566
             center_lon = map_data['lon'].mean() if len(map_data) > 0 else 2.3522
             
-            m = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB dark_matter")
+            m = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB dark_matter", scrollWheelZoom=False)
             
             for idx, row in map_data.iterrows():
                 bar_games_count = len(st.session_state.games_data[st.session_state.games_data['bar_name'] == row['Nom']])
@@ -879,6 +922,7 @@ try:
                 ).add_to(m)
             
             st_folium(m, width="100%", height=500, key="folium_map_games")
+            st.markdown('<div class="scroll-indicator">⬇️ Résultats plus bas ⬇️</div>', unsafe_allow_html=True)
 
         with col_results:
              if not map_data.empty:
