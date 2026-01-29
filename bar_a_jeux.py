@@ -39,6 +39,15 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] {background-color: #E6F3FF; border-radius: 8px 8px 0 0;}
     .stTabs [aria-selected="true"] {background-color: #1E90FF !important; color: white !important;}
     
+    /* Sticky Navigation */
+    div[data-testid="stVerticalBlock"] > div:has(div[data-baseweb="tab-list"]) {
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        background-color: white;
+        padding-top: 1rem;
+    }
+    
     .bar-box {background: #E6F3FF; padding: 10px; border-radius: 8px; margin: 5px 0; cursor: pointer; border: 1px solid #1E90FF;}
     .bar-box:hover {background: #D0E8FF;}
     .game-item {padding: 5px; margin: 3px 0;}
@@ -561,40 +570,35 @@ if len(st.session_state.game_requests) == 0:
 # Header with Profile - HTML/CSS Implementation for better mobile Control
 # We use a container to align Logo and Profile
 # Header with Profile - Simplified
-col_logo, col_title, col_user = st.columns([1, 3, 2])
+col_header, col_user = st.columns([2, 1])
 
-with col_logo:
+with col_header:
     if os.path.exists(LOGO_PATH):
-        st.image(LOGO_PATH, width=80)
+        st.image(LOGO_PATH, width=300) # Increased logo size
     else:
-        st.markdown("<h1>🎮</h1>", unsafe_allow_html=True)
-
-with col_title:
-    st.markdown("<h1 style='margin-top: 0; padding-top: 10px;'>Echec et Map</h1>", unsafe_allow_html=True)
+        st.markdown("<h1>🎮 Echec et Map</h1>", unsafe_allow_html=True)
 
 with col_user:
     if st.session_state.logged_in:
         # Créer deux colonnes pour l'avatar et le nom
-        col_avatar, col_name = st.columns([1, 3])
+        col_avatar, col_name = st.columns([1, 2])
         
         with col_avatar:
             # Afficher l'avatar de l'utilisateur s'il existe
             user_icon_path = st.session_state.user_icon
             if user_icon_path and os.path.exists(user_icon_path):
-                st.image(user_icon_path, width=40)
+                st.image(user_icon_path, width=50)
             else:
                 st.markdown("👤", unsafe_allow_html=True)
         
         with col_name:
             st.markdown(f"<div style='padding-top: 8px;'><b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
-        
-        # Logout button
-        if st.button("Se déconnecter", key="logout_btn", use_container_width=True):
-             st.session_state.logged_in = False
-             st.session_state.username = ""
-             st.session_state.role = "user"
-             st.session_state.admin_logged_in = False
-             st.rerun()
+            if st.button("Se déconnecter", key="logout_btn", use_container_width=True):
+                 st.session_state.logged_in = False
+                 st.session_state.username = ""
+                 st.session_state.role = "user"
+                 st.session_state.admin_logged_in = False
+                 st.rerun()
 
 # Vérification de connexion - afficher login si non connecté
 if not st.session_state.logged_in:
@@ -616,65 +620,132 @@ try:
     
     # Tabs 
     if st.session_state.admin_logged_in:
-        tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Carte", "🎮 Liste de jeux", "💬 Forum", "🔧 Admin"])
+        tab1, tab2, tab3, tab4 = st.tabs(["🍷 Les Bars", "🎲 Les Jeux", "💬 Forum", "🔧 Admin"])
     else:
-        tab1, tab2, tab3 = st.tabs(["🗺️ Carte", "🎮 Liste de jeux", "💬 Forum"])
+        tab1, tab2, tab3 = st.tabs(["🍷 Les Bars", "🎲 Les Jeux", "💬 Forum"])
     
-    # TAB 1: Map (Folium)
+    # TAB 1: LES BARS (Fiche par bar)
     with tab1:
-        # 1. Search Filters on TOP
-        with st.container():
-            st.markdown("### 🔍 Recherche")
-            col_f1, col_f2, col_f3 = st.columns(3)
-            
-            with col_f1:
-                bar_options = ["Tous"] + sorted(gdf_bar['Nom'].tolist())
-                selected_bar = st.selectbox("📍 Bar :", bar_options)
-            
-            with col_f2:
-                arrondissements = sorted(gdf_bar['Arrondissement'].dropna().unique(), key=lambda x: int(x) if str(x).isdigit() else 999)
-                selected_arrond = st.selectbox("🏙️ Arrondissement :", ["Tous"] + [str(a) for a in arrondissements])
-            
-            with col_f3:
-                if not st.session_state.games_data.empty:
-                    all_games = sorted(st.session_state.games_data['game'].unique())
-                    selected_game = st.selectbox("🎲 Jeu :", ["Tous"] + all_games)
-                else:
-                     st.write("Chargement des jeux...")
-                     selected_game = "Tous"
-
-        st.markdown("---")
-
-        # Logic for filtering
-        filtered_gdf = gdf_bar.copy()
-        has_filter = False
+        st.subheader("🍷 Découvrir un Bar")
         
-        if selected_bar != "Tous":
-            filtered_gdf = filtered_gdf[filtered_gdf['Nom'] == selected_bar]
-            has_filter = True
+        # Select Bar
+        bar_options = sorted(gdf_bar['Nom'].tolist())
+        selected_bar_name = st.selectbox("Choisissez un établissement :", bar_options)
         
-        if selected_arrond != "Tous":
-            filtered_gdf = filtered_gdf[filtered_gdf['Arrondissement'].astype(str) == selected_arrond]
-            has_filter = True
+        # Get Bar Data
+        bar_data = gdf_bar[gdf_bar['Nom'] == selected_bar_name].iloc[0]
         
-        if selected_game != "Tous":
-            bars_with_game = st.session_state.games_data[st.session_state.games_data['game'] == selected_game]['bar_name'].unique()
-            filtered_gdf = filtered_gdf[filtered_gdf['Nom'].isin(bars_with_game)]
-            has_filter = True
+        # Layout: Image + Info
+        col_details, col_games = st.columns([1, 1])
+        
+        with col_details:
+            # Image Logic
+            # Try to find image in images_bars folder
+            # Assuming file name matches bar name approx or user said "nom de bars correspond comme nom de fichier"
+            # We try exact match with extensions
+            image_found = None
+            possible_exts = ['.jpg', '.jpeg', '.png', '.webp']
+            base_img_path = os.path.join(os.path.dirname(__file__), 'images_bars')
+            
+            # Clean name for filename matching if needed, but user said "corresponding name"
+            # Let's try exact first
+            for ext in possible_exts:
+                img_path = os.path.join(base_img_path, f"{selected_bar_name}{ext}")
+                if os.path.exists(img_path):
+                    image_found = img_path
+                    break
+            
+            if image_found:
+                st.image(image_found, use_container_width=True)
+            else:
+                st.info("🖼️ Pas d'image disponible")
+            
+            st.markdown(f"### {selected_bar_name}")
+            st.markdown(f"**📍 Adresse :** {bar_data['Adresse']}")
+            
+            if pd.notna(bar_data.get('Métro')):
+                 st.markdown(f"**🚇 Accès :** {bar_data['Métro']}")
+            
+            if pd.notna(bar_data.get('Téléphone')):
+                 st.markdown(f"**📞 Téléphone :** {bar_data['Téléphone']}")
+            
+            # Google Maps Link
+            # Using query with address
+            encoded_address = requests.utils.quote(bar_data['Adresse']) if 'requests' in locals() else bar_data['Adresse'].replace(' ', '+')
+            maps_url = f"https://www.google.com/maps/search/?api=1&query={encoded_address}"
+            
+            st.markdown(f"""
+            <a href="{maps_url}" target="_blank" style="text-decoration: none;">
+                <button style="
+                    background-color: #4285F4; 
+                    color: white; 
+                    padding: 10px 20px; 
+                    border: none; 
+                    border-radius: 5px; 
+                    cursor: pointer; 
+                    font-weight: bold; 
+                    width: 100%;
+                    margin-top: 10px;
+                ">
+                📍 Y ALLER (Google Maps)
+                </button>
+            </a>
+            """, unsafe_allow_html=True)
+            
+        with col_games:
+            st.markdown("### 🎲 Jeux Disponibles")
+            bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == selected_bar_name]
+            
+            if not bar_games.empty:
+                games_list = sorted(bar_games['game'].tolist())
+                st.write(f"**{len(games_list)} jeux référencés**")
+                
+                # Search within the bar's games
+                search_in_bar = st.text_input("Filtrer cette liste :", placeholder="Nom du jeu...", key="search_in_bar_input")
+                
+                if search_in_bar:
+                    games_list = [g for g in games_list if search_in_bar.lower() in g.lower()]
+                
+                # Scrollable container for games
+                with st.container(height=400):
+                    for game in games_list:
+                        st.markdown(f"<div class='game-item'>🔹 {game}</div>", unsafe_allow_html=True)
+            else:
+                st.warning("Aucun jeu listé pour ce bar.")
 
-        # 2. Map and Results Layout
-        # Two columns: Map (Larger) | List (Smaller, scrollable if needed)
-        col_map, col_list = st.columns([2, 1])
+    # TAB 2: LES JEUX (Recherche croisée)
+    with tab2:
+        st.subheader("🎲 Trouver un bar par jeu")
+        
+        # Multiselect for Games
+        if not st.session_state.games_data.empty:
+            all_games = sorted(st.session_state.games_data['game'].unique())
+            selected_games_multi = st.multiselect("Sélectionnez un ou plusieurs jeux :", all_games)
+        else:
+             st.write("Chargement des jeux...")
+             selected_games_multi = []
+
+        # Logic for filtering map
+        if selected_games_multi:
+            # Find bars that have AT LEAST ONE of the selected games
+            # Or ALL? Usually users want to find a place that has "This OR That".
+            # If they want to play specific X AND Y, it's rarer but possible.
+            # Let's do OR for now (bars containing any of the selected).
+            
+            bars_with_games = st.session_state.games_data[st.session_state.games_data['game'].isin(selected_games_multi)]['bar_name'].unique()
+            map_data = gdf_bar[gdf_bar['Nom'].isin(bars_with_games)]
+            
+            st.info(f"{len(map_data)} bar(s) proposent ces jeux.")
+        else:
+            # Show all if nothing selected? Or none?
+            # "afficher uniquement les bars correspondants" implies fitlering.
+            # Showing all by default is nicer visually.
+            map_data = gdf_bar
+            st.markdown("*Sélectionnez des jeux pour filtrer la carte.*")
+
+        col_map, col_results = st.columns([2, 1])
 
         with col_map:
-            st.subheader("🗺️ Carte Interactive")
-            
-            # Map point selection
-            if has_filter and len(filtered_gdf) > 0:
-                map_data = filtered_gdf
-            else:
-                map_data = gdf_bar
-            
             # Center map
             center_lat = map_data['lat'].mean() if len(map_data) > 0 else 48.8566
             center_lon = map_data['lon'].mean() if len(map_data) > 0 else 2.3522
@@ -682,15 +753,24 @@ try:
             m = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB dark_matter")
             
             for idx, row in map_data.iterrows():
-                bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == row['Nom']]
-                game_count = len(bar_games)
+                bar_games_count = len(st.session_state.games_data[st.session_state.games_data['bar_name'] == row['Nom']])
                 
-                # Enhanced Popup
+                # Check which of the selected games are here
+                if selected_games_multi:
+                    games_here = st.session_state.games_data[
+                        (st.session_state.games_data['bar_name'] == row['Nom']) & 
+                        (st.session_state.games_data['game'].isin(selected_games_multi))
+                    ]['game'].tolist()
+                    games_snippet = "<br>• " + "<br>• ".join(games_here[:5])
+                    if len(games_here) > 5: games_snippet += "..."
+                else:
+                    games_snippet = f"{bar_games_count} jeux"
+
                 popup_html = f"""
                 <div style="font-family: 'Montserrat', sans-serif; min-width: 200px;">
                     <h5 style="color: #1E90FF; margin-bottom: 5px; font-weight:bold;">{row['Nom']}</h5>
                     <p style="margin: 2px 0; font-size:12px;"><b>📍 ADRESSE:</b><br>{row['Adresse']}</p>
-                    <p style="margin: 2px 0; font-size:12px;"><b>🎮 JEUX:</b> {game_count}</p>
+                    <div style="margin-top:5px; font-size:12px; color:green;"><b>MATCH:</b>{games_snippet}</div>
                 </div>
                 """
                 
@@ -698,123 +778,60 @@ try:
                     [row['lat'], row['lon']],
                     popup=folium.Popup(popup_html, max_width=300),
                     tooltip=row['Nom'],
-                    icon=folium.Icon(color="blue", icon="glass", prefix="fa")
+                    icon=folium.Icon(color="green" if selected_games_multi else "blue", icon="gamepad", prefix="fa")
                 ).add_to(m)
             
-            # Capture map interactions
-            map_output = st_folium(m, width="100%", height=500, key="folium_map")
-            
-            # Update filter based on marker click
-            if map_output and map_output.get("last_object_clicked"):
-                clicked_lat = map_output["last_object_clicked"].get("lat")
-                clicked_lng = map_output["last_object_clicked"].get("lng")
-                
-                if clicked_lat and clicked_lng:
-                    # Find the bar that was clicked
-                    for idx, row in map_data.iterrows():
-                        if abs(row['lat'] - clicked_lat) < 0.0001 and abs(row['lon'] - clicked_lng) < 0.0001:
-                            # Update the displayed info to show only this bar
-                            filtered_gdf = map_data[map_data['Nom'] == row['Nom']]
-                            has_filter = True # This only affects list below, as map is already rendered
-                            break
+            st_folium(m, width="100%", height=500, key="folium_map_games")
 
-        with col_list:
-            st.subheader("📍 Résultats")
-            if has_filter and len(filtered_gdf) > 0:
-                st.info(f"{len(filtered_gdf)} Lieu(x) trouvé(s)")
-                
-                for idx, row in filtered_gdf.iterrows():
-                    bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == row['Nom']]
-                    game_count = len(bar_games)
-                    
-                    st.markdown(f"""
-                    <div class='bar-box'>
-                        <h4 style='margin:0; color: #003366; font-size:16px;'>{row['Nom']}</h4>
-                        <div style='font-size:13px; color:#555; margin-top:5px;'>
-                            {f"🚇 {row['Métro']}<br>" if pd.notna(row['Métro']) else ""}
-                            {f"📞 {row['Téléphone']}<br>" if pd.notna(row['Téléphone']) else ""}
-                            🎮 <b>{game_count}</b> jeux disponibles
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            elif has_filter:
-                st.warning("Aucun bar ne correspond à la recherche.")
-            else:
-                st.write("👈 Utilisez la carte ou les filtres pour affiner.")
+        with col_results:
+             if not map_data.empty:
+                 st.write("### Résultats")
+                 for idx, row in map_data.iterrows():
+                     with st.expander(f"📍 {row['Nom']}"):
+                         st.write(f"🏠 {row['Adresse']}")
+                         if pd.notna(row.get('Métro')): st.write(f"🚇 {row['Métro']}")
+                         
+                         # List games found here
+                         if selected_games_multi:
+                             found_games = st.session_state.games_data[
+                                (st.session_state.games_data['bar_name'] == row['Nom']) & 
+                                (st.session_state.games_data['game'].isin(selected_games_multi))
+                             ]['game'].tolist()
+                             st.write("**Jeux trouvés:**")
+                             for g in found_games:
+                                 st.write(f"- {g}")
+             else:
+                 st.warning("Aucun bar ne propose ces jeux simultanément.")
 
-    # TAB 2: Games
-    with tab2:
-        st.subheader("🎮 Liste des Jeux")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            search_bar_filter = st.selectbox("Bar :", ["Tous"] + sorted(gdf_bar['Nom'].tolist()), key="game_bar")
-        with col2:
-            search_game_text = st.text_input("Rechercher :", placeholder="Nom du jeu...")
-        
-        filtered_games = st.session_state.games_data.copy()
-        
-        if search_bar_filter != "Tous":
-            filtered_games = filtered_games[filtered_games['bar_name'] == search_bar_filter]
-        
-        if search_game_text:
-            filtered_games = filtered_games[filtered_games['game'].str.contains(search_game_text, case=False, na=False)]
-        
-        if not filtered_games.empty:
-            st.markdown(f"**{len(filtered_games)} jeu(x)**")
-            st.markdown("---")
+        st.markdown("---")
+        st.markdown("### ➕ Demander un Jeu (ou modification)")
+        with st.form("request_game_new"):
+            col_req1, col_req2 = st.columns(2)
+            with col_req1:
+                req_user = st.text_input("Votre Nom/Pseudo :", value=st.session_state.username)
+                req_bar = st.selectbox("Bar concerné :", gdf_bar['Nom'].sort_values().tolist())
+            with col_req2:
+                req_game = st.text_input("Nom du Jeu :")
+                req_action = st.selectbox("Type de demande :", ["Ajouter le jeu", "Signaler une erreur"])
             
-            # Custom HTML compartmentalization
-            for bar in filtered_games['bar_name'].unique():
-                games = sorted(filtered_games[filtered_games['bar_name'] == bar]['game'].tolist())
-                bar_id = bar.replace(" ", "_")
-                
-                if bar_id not in st.session_state.show_games:
-                    st.session_state.show_games[bar_id] = False
-                
-                # Toggle button
-                if st.button(f"{bar} ({len(games)} jeux)", key=f"toggle_{bar_id}"):
-                    st.session_state.show_games[bar_id] = not st.session_state.show_games[bar_id]
-                
-                # Show games if toggled
-                if st.session_state.show_games.get(bar_id, False):
-                    cols_per_row = 3
-                    for i in range(0, len(games), cols_per_row):
-                        cols = st.columns(cols_per_row)
-                        for j, game in enumerate(games[i:i+cols_per_row]):
-                            cols[j].markdown(f"<div class='game-item'>🎮 {game}</div>", unsafe_allow_html=True)
-                
-                st.markdown("---")
-        else:
-            st.info("Aucun jeu")
-        
-        st.markdown("### ➕ Demander un Jeu")
-        with st.form("request_game"):
-            col1, col2 = st.columns(2)
-            with col1:
-                req_user = st.text_input("Nom :")
-                req_bar = st.selectbox("Bar :", gdf_bar['Nom'].sort_values().tolist())
-            with col2:
-                req_game = st.text_input("Jeu :")
-                req_action = st.selectbox("Type :", ["Ajouter", "Modifier"])
-            req_desc = st.text_area("Description :")
+            req_desc = st.text_area("Description / Détails :", placeholder="Ex: Le jeu n'est plus disponible...")
             
-            if st.form_submit_button("📤 Envoyer"):
+            if st.form_submit_button("📤 Envoyer la demande"):
                 if req_user and req_game and req_bar:
                     request = {
                         'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M"),
                         'username': req_user,
                         'bar_name': req_bar,
                         'game_name': req_game,
-                        'action_type': req_action.lower(),
+                        'action_type': req_action,
                         'description': req_desc,
                         'status': 'pending'
                     }
                     st.session_state.game_requests.append(request)
                     save_game_request(request)
-                    st.success("✅")
+                    st.success("✅ Demande envoyée aux administrateurs !")
                 else:
-                    st.error("⚠️ Champs requis")
+                    st.error("⚠️ Veuillez remplir le nom, le bar et le jeu.")
     
     # TAB 3: Forum
     with tab3:
