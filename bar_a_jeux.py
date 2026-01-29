@@ -706,12 +706,12 @@ try:
         
         with col_filters_2:
             # Arrondissement Filter
-            # Assuming 'Code_postal' or extraction from Address is needed.
-            # Let's try to extract postcode from 'Adresse' if not available
+            # Ensure we extract full 750XX
             if 'Code_postal' not in gdf_bar.columns:
-                 # Extract 750XX from address
+                 # Extract 5 digits starting with 75
                  gdf_bar['Code_postal'] = gdf_bar['Adresse'].astype(str).str.extract(r'(75\d{3})')
             
+            # Sort unique zips
             unique_zips = sorted(gdf_bar['Code_postal'].dropna().unique())
             selected_zips = st.multiselect("Arrondissement", unique_zips, placeholder="Tous")
 
@@ -721,44 +721,39 @@ try:
         if selected_zips:
             filtered_gdf = filtered_gdf[filtered_gdf['Code_postal'].isin(selected_zips)]
             
-        # Determine Map Center & Zoom
-        # Logic to handle sync: If we came from a map click, we want to update the selectbox index
-        # But selectbox index changes trigger rerun. 
-        # We need to find the index of the currently selected bar in the options list
+        # --- Bidirectional Sync Logic ---
+        # 1. Capture Map Click (Session State 'last_selected_bar')
+        # 2. Capture Widget Input (switched to Session State key 'search_bar_main')
+        
+        # When widget changes, it updates 'search_bar_main'. We should sync 'last_selected_bar'.
+        if st.session_state.get('search_bar_main'):
+             # If widget has a value, sync it to last selection
+             if st.session_state.get('last_selected_bar') != st.session_state['search_bar_main']:
+                 st.session_state['last_selected_bar'] = st.session_state['search_bar_main']
+        
+        # When map click updates 'last_selected_bar', we need widget to reflect it.
+        # This is handled by passing 'key="search_bar_main"' to selectbox AND updating that key in session_state on click.
+        # But we must ensure precedence. A map click triggers a rerun. The widget will read the updated key.
         
         current_selection = st.session_state.get('last_selected_bar', "")
         
-        # Determine Map Center
-        # Only zoom to selection if it is in the CURRENTLY filtered view
+        # Map Center Logic
         if current_selection and current_selection in filtered_gdf['Nom'].values:
-            target_bar = filtered_gdf[filtered_gdf['Nom'] == current_selection].iloc[0]
-            map_center = [target_bar['lat'], target_bar['lon']]
-            map_zoom = 15
+             target_bar = filtered_gdf[filtered_gdf['Nom'] == current_selection].iloc[0]
+             map_center = [target_bar['lat'], target_bar['lon']]
+             map_zoom = 15
         else:
-            map_center = [filtered_gdf['lat'].mean(), filtered_gdf['lon'].mean()] if not filtered_gdf.empty else [48.8566, 2.3522]
-            map_zoom = 12
-
-        # Note: We rely on the selectbox 'key' and state sync to update the UI box.
-        # But if the selected bar is filtered out by Zip, it won't show in the dropdown options generally?
-        # Actually it might, because options use 'all_bar_names'. Just map interaction is limited.
-        # Wait, if `selected_zips` is active, `filtered_gdf` is subset.
-        # The map will only show pins for `filtered_gdf`.
-        # So clicking a pin outside isn't possible (it's not there).
-        # But if user selects bar from dropdown that is NOT in zip? It updates state.
-        # But map won't zoom to it if we check `in filtered_gdf`. That's correct behavior (don't zoom to hidden).
+             map_center = [filtered_gdf['lat'].mean(), filtered_gdf['lon'].mean()] if not filtered_gdf.empty else [48.8566, 2.3522]
+             map_zoom = 12
 
         # --- Layout: Map (Left/Center) | Details (Right) ---
         col_map, col_details = st.columns([2, 1])
         
         with col_map:
-            # Add Scroll Indicator ABOVE the map
-            st.markdown('<div class="scroll-indicator">⬇️ Cliquez sur les pins pour voir les infos ⬇️</div>', unsafe_allow_html=True)
-
             m = folium.Map(location=map_center, zoom_start=map_zoom, tiles="CartoDB dark_matter", scrollWheelZoom=False)
             
             # Add markers
             for idx, row in filtered_gdf.iterrows():
-                # Color logic: Highlight if selected
                 is_selected = (current_selection == row['Nom'])
                 icon_color = "red" if is_selected else "blue"
                 
@@ -771,11 +766,13 @@ try:
             # Display Map & Capture Returns
             map_return = st_folium(m, width="100%", height=600, key="main_map")
             
+            # Scroll Indicator BELOW Map
+            st.markdown('<div class="scroll-indicator">⬇️ Infos plus bas ⬇️</div>', unsafe_allow_html=True)
+            
             # Handle Click Events
             if map_return and map_return.get("last_object_clicked"):
                 clicked_pos = map_return["last_object_clicked"]
                 # Find bar with this position
-                # CRITICAL FIX: Parentheses around conditions for correct precedence
                 clicked_bar = filtered_gdf[
                     ((filtered_gdf['lat'] - clicked_pos['lat']).abs() < 0.0001) & 
                     ((filtered_gdf['lon'] - clicked_pos['lng']).abs() < 0.0001)
@@ -783,11 +780,12 @@ try:
                 
                 if not clicked_bar.empty:
                     selected_name = clicked_bar.iloc[0]['Nom']
-                    if st.session_state.get('last_selected_bar') != selected_name:
-                        st.session_state['last_selected_bar'] = selected_name
-                        # Sync with search bar
-                        st.session_state['search_bar_main'] = selected_name
-                        st.rerun()
+                    # Use session state to manage sync.
+                    # This ensures next rerun has the correct bar selected in widget too.
+                    if st.session_state.get('search_bar_main') != selected_name:
+                         st.session_state['search_bar_main'] = selected_name
+                         st.session_state['last_selected_bar'] = selected_name
+                         st.rerun()
 
         with col_details:
             # We use the session state directly
@@ -889,8 +887,7 @@ try:
             center_lat = map_data['lat'].mean() if len(map_data) > 0 else 48.8566
             center_lon = map_data['lon'].mean() if len(map_data) > 0 else 2.3522
             
-            # Add Scroll Indicator ABOVE the map
-            st.markdown('<div class="scroll-indicator">⬇️ Résultats plus bas ⬇️</div>', unsafe_allow_html=True)
+
 
             m = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB dark_matter", scrollWheelZoom=False)
             
@@ -924,12 +921,17 @@ try:
                 ).add_to(m)
             
             st_folium(m, width="100%", height=500, key="folium_map_games")
+            
+            # Scroll Indicator BELOW Map
+            st.markdown('<div class="scroll-indicator">⬇️ Résultats plus bas ⬇️</div>', unsafe_allow_html=True)
 
         with col_results:
              if not map_data.empty:
                  st.write("### Résultats")
                  for idx, row in map_data.iterrows():
-                     with st.expander(f"📍 {row['Nom']}"):
+                     # Clean bar name of likely artifacts
+                     clean_name = str(row['Nom']).replace("arrow_right", "").replace("->", "").strip()
+                     with st.expander(f"📍 {clean_name}"):
                          st.write(f"🏠 {row['Adresse']}")
                          if pd.notna(row.get('Métro')): st.write(f"🚇 {row['Métro']}")
                          
