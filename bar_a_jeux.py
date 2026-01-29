@@ -15,8 +15,48 @@ from streamlit_folium import st_folium
 import hashlib
 import glob
 import base64
+import difflib
+import unicodedata
 
 LOGO_PATH = os.path.join(os.path.dirname(__file__), 'logo.png')
+# Update path to point to the nested directory as discovered
+IMAGES_DIR = os.path.join(os.path.dirname(__file__), 'images_bars', 'images_bars') 
+
+def normalize_string(s):
+    """Normalize string for comparison (remove accents, lowercase, etc.)"""
+    if not isinstance(s, str): return ""
+    ns = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8')
+    return ns.lower().strip().replace(' ', '_').replace('-', '_')
+
+def find_best_image_match(bar_name, images_dir):
+    """Find the best matching image file for a given bar name using fuzzy matching."""
+    if not os.path.exists(images_dir):
+        return None
+        
+    normalized_name = normalize_string(bar_name)
+    
+    # Get all files in directory
+    try:
+        files = [f for f in os.listdir(images_dir) if os.path.isfile(os.path.join(images_dir, f))]
+        valid_extensions = ['.jpg', '.jpeg', '.png', '.webp']
+        image_files = [f for f in files if any(f.lower().endswith(ext) for ext in valid_extensions)]
+    except Exception as e:
+        return None
+
+    # 1. Exact match (normalized)
+    for img_file in image_files:
+        if normalize_string(os.path.splitext(img_file)[0]) == normalized_name:
+            return os.path.join(images_dir, img_file)
+
+    # 2. Fuzzy match
+    # Create a map of normalized filenames to real filenames
+    norm_map = {normalize_string(os.path.splitext(f)[0]): f for f in image_files}
+    matches = difflib.get_close_matches(normalized_name, norm_map.keys(), n=1, cutoff=0.6)
+    
+    if matches:
+        return os.path.join(images_dir, norm_map[matches[0]])
+    
+    return None
 page_icon = "🎮"
 if os.path.exists(LOGO_PATH):
     page_icon = LOGO_PATH
@@ -574,7 +614,7 @@ col_header, col_user = st.columns([2, 1])
 
 with col_header:
     if os.path.exists(LOGO_PATH):
-        st.image(LOGO_PATH, width=300) # Increased logo size
+        st.image(LOGO_PATH, width=200) # Increased logo size
     else:
         st.markdown("<h1>🎮 Echec et Map</h1>", unsafe_allow_html=True)
 
@@ -625,123 +665,180 @@ try:
         tab1, tab2, tab3 = st.tabs(["🍷 Les Bars", "🎲 Les Jeux", "💬 Forum"])
     
     # TAB 1: LES BARS (Fiche par bar)
+    # TAB 1: LES BARS (Carte Interactive + Détails)
     with tab1:
-        st.subheader("🍷 Découvrir un Bar")
+        st.subheader("🍷 Explorer la Carte des Bars")
         
-        # Select Bar
-        bar_options = sorted(gdf_bar['Nom'].tolist())
-        selected_bar_name = st.selectbox("Choisissez un établissement :", bar_options)
+        # --- Filters ---
+        col_filters_1, col_filters_2 = st.columns([3, 1])
+        with col_filters_1:
+             # Search Bar (Autocomplete)
+             all_bar_names = sorted(gdf_bar['Nom'].tolist())
+             search_query = st.selectbox("🔍 Rechercher un bar spécifique :", 
+                                        options=[""] + all_bar_names, 
+                                        index=0,
+                                        key="search_bar_main")
         
-        # Get Bar Data
-        bar_data = gdf_bar[gdf_bar['Nom'] == selected_bar_name].iloc[0]
+        with col_filters_2:
+            # Arrondissement Filter
+            # Assuming 'Code_postal' or extraction from Address is needed.
+            # Let's try to extract postcode from 'Adresse' if not available
+            if 'Code_postal' not in gdf_bar.columns:
+                 # Extract 750XX from address
+                 gdf_bar['Code_postal'] = gdf_bar['Adresse'].astype(str).str.extract(r'(75\d{3})')
+            
+            unique_zips = sorted(gdf_bar['Code_postal'].dropna().unique())
+            selected_zips = st.multiselect("Arrondissement", unique_zips, placeholder="Tous")
+
+        # --- Filter Data ---
+        filtered_gdf = gdf_bar.copy()
         
-        # Layout: Image + Info
-        col_details, col_games = st.columns([1, 1])
+        if selected_zips:
+            filtered_gdf = filtered_gdf[filtered_gdf['Code_postal'].isin(selected_zips)]
+            
+        # Determine Map Center & Zoom
+        if search_query and search_query in filtered_gdf['Nom'].values:
+            # Zoom to selected bar
+            target_bar = filtered_gdf[filtered_gdf['Nom'] == search_query].iloc[0]
+            map_center = [target_bar['lat'], target_bar['lon']]
+            map_zoom = 15
+            # Also set this bar as selected in session state if not already
+            if st.session_state.get('last_selected_bar') != search_query:
+                st.session_state['last_selected_bar'] = search_query
+        else:
+            map_center = [filtered_gdf['lat'].mean(), filtered_gdf['lon'].mean()] if not filtered_gdf.empty else [48.8566, 2.3522]
+            map_zoom = 12
+
+        # --- Layout: Map (Left/Center) | Details (Right) ---
+        col_map, col_details = st.columns([2, 1])
         
+        with col_map:
+            m = folium.Map(location=map_center, zoom_start=map_zoom, tiles="CartoDB dark_matter")
+            
+            # Add markers
+            for idx, row in filtered_gdf.iterrows():
+                # Color logic: Highlight if selected
+                is_selected = (st.session_state.get('last_selected_bar') == row['Nom'])
+                icon_color = "red" if is_selected else "blue"
+                
+                folium.Marker(
+                    [row['lat'], row['lon']],
+                    tooltip=row['Nom'],
+                    icon=folium.Icon(color=icon_color, icon="glass-cheers", prefix="fa")
+                ).add_to(m)
+            
+            # Display Map & Capture Returns
+            map_return = st_folium(m, width="100%", height=600, key="main_map")
+            
+            # Handle Click Events
+            if map_return and map_return.get("last_object_clicked"):
+                clicked_pos = map_return["last_object_clicked"]
+                # Find bar with this position (approximate match since floats can vary slightly)
+                # Using a small epsilon for float comparison
+                clicked_bar = filtered_gdf[
+                    (filtered_gdf['lat'] - clicked_pos['lat']).abs() < 0.0001 & 
+                    (filtered_gdf['lon'] - clicked_pos['lng']).abs() < 0.0001
+                ]
+                
+                if not clicked_bar.empty:
+                    selected_name = clicked_bar.iloc[0]['Nom']
+                    if st.session_state.get('last_selected_bar') != selected_name:
+                        st.session_state['last_selected_bar'] = selected_name
+                        st.rerun()
+
         with col_details:
-            # Image Logic
-            # Try to find image in images_bars folder
-            # Assuming file name matches bar name approx or user said "nom de bars correspond comme nom de fichier"
-            # We try exact match with extensions
-            image_found = None
-            possible_exts = ['.jpg', '.jpeg', '.png', '.webp']
-            base_img_path = os.path.join(os.path.dirname(__file__), 'images_bars')
+            selected_bar_name = st.session_state.get('last_selected_bar')
             
-            # Clean name for filename matching if needed, but user said "corresponding name"
-            # Let's try exact first
-            for ext in possible_exts:
-                img_path = os.path.join(base_img_path, f"{selected_bar_name}{ext}")
-                if os.path.exists(img_path):
-                    image_found = img_path
-                    break
-            
-            if image_found:
-                st.image(image_found, use_container_width=True)
+            # If search query was used, it overrides/updates the selection
+            if search_query and search_query != selected_bar_name:
+                 # logic handled above by map center, but let's ensure consistency
+                 pass 
+
+            if selected_bar_name:
+                # Find data
+                bar_match = gdf_bar[gdf_bar['Nom'] == selected_bar_name]
+                if not bar_match.empty:
+                    bar_data = bar_match.iloc[0]
+                    
+                    # 1. Image
+                    img_path = find_best_image_match(selected_bar_name, IMAGES_DIR)
+                    if img_path:
+                        st.image(img_path, use_container_width=True)
+                    else:
+                        # Placeholder
+                        st.markdown("""
+                        <div style="background-color:#E6F3FF; height:200px; display:flex; align-items:center; justify-content:center; border-radius:10px; border: 2px dashed #1E90FF;">
+                            <span style="color:#1E90FF; font-size:40px;">📷</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    # 2. Title & Info
+                    st.markdown(f"## {selected_bar_name}")
+                    st.markdown(f"📍 **Adresse:** {bar_data['Adresse']}")
+                    if pd.notna(bar_data.get('Métro')): st.markdown(f"🚇 **Métro:** {bar_data['Métro']}")
+                    
+                    # 3. Y Aller Button
+                    encoded_address = bar_data['Adresse'].replace(' ', '+')
+                    maps_url = f"https://www.google.com/maps/search/?api=1&query={encoded_address}"
+                    st.markdown(f"""
+                        <a href="{maps_url}" target="_blank" style="text-decoration: none;">
+                            <button style="width:100%; background-color:#34A853; color:white; padding:10px; border:none; border-radius:5px; font-weight:bold; cursor:pointer; margin: 10px 0;">
+                                🏃 Y ALLER
+                            </button>
+                        </a>
+                    """, unsafe_allow_html=True)
+                    
+                    # 4. Games List (Bullet points)
+                    st.markdown("### 🎲 Jeux Disponibles")
+                    bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == selected_bar_name]
+                    
+                    if not bar_games.empty:
+                        games_list = sorted(bar_games['game'].tolist())
+                        with st.container(height=300):
+                            for g in games_list:
+                                st.markdown(f"- {g}")
+                    else:
+                        st.info("⚠️ Liste de jeux non disponible.")
             else:
-                st.info("🖼️ Pas d'image disponible")
-            
-            st.markdown(f"### {selected_bar_name}")
-            st.markdown(f"**📍 Adresse :** {bar_data['Adresse']}")
-            
-            if pd.notna(bar_data.get('Métro')):
-                 st.markdown(f"**🚇 Accès :** {bar_data['Métro']}")
-            
-            if pd.notna(bar_data.get('Téléphone')):
-                 st.markdown(f"**📞 Téléphone :** {bar_data['Téléphone']}")
-            
-            # Google Maps Link
-            # Using query with address
-            encoded_address = requests.utils.quote(bar_data['Adresse']) if 'requests' in locals() else bar_data['Adresse'].replace(' ', '+')
-            maps_url = f"https://www.google.com/maps/search/?api=1&query={encoded_address}"
-            
-            st.markdown(f"""
-            <a href="{maps_url}" target="_blank" style="text-decoration: none;">
-                <button style="
-                    background-color: #4285F4; 
-                    color: white; 
-                    padding: 10px 20px; 
-                    border: none; 
-                    border-radius: 5px; 
-                    cursor: pointer; 
-                    font-weight: bold; 
-                    width: 100%;
-                    margin-top: 10px;
-                ">
-                📍 Y ALLER (Google Maps)
-                </button>
-            </a>
-            """, unsafe_allow_html=True)
-            
-        with col_games:
-            st.markdown("### 🎲 Jeux Disponibles")
-            bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == selected_bar_name]
-            
-            if not bar_games.empty:
-                games_list = sorted(bar_games['game'].tolist())
-                st.write(f"**{len(games_list)} jeux référencés**")
-                
-                # Search within the bar's games
-                search_in_bar = st.text_input("Filtrer cette liste :", placeholder="Nom du jeu...", key="search_in_bar_input")
-                
-                if search_in_bar:
-                    games_list = [g for g in games_list if search_in_bar.lower() in g.lower()]
-                
-                # Scrollable container for games
-                with st.container(height=400):
-                    for game in games_list:
-                        st.markdown(f"<div class='game-item'>🔹 {game}</div>", unsafe_allow_html=True)
-            else:
-                st.warning("Aucun jeu listé pour ce bar.")
+                st.info("👈 Cliquez sur un pin ou utilisez la recherche pour voir les détails.")
 
     # TAB 2: LES JEUX (Recherche croisée)
     with tab2:
         st.subheader("🎲 Trouver un bar par jeu")
         
         # Multiselect for Games
-        if not st.session_state.games_data.empty:
-            all_games = sorted(st.session_state.games_data['game'].unique())
-            selected_games_multi = st.multiselect("Sélectionnez un ou plusieurs jeux :", all_games)
-        else:
-             st.write("Chargement des jeux...")
-             selected_games_multi = []
-
         # Logic for filtering map
+        col_t2_filter1, col_t2_filter2 = st.columns([3, 1])
+        with col_t2_filter1:
+            if not st.session_state.games_data.empty:
+                all_games = sorted(st.session_state.games_data['game'].unique())
+                selected_games_multi = st.multiselect("Sélectionnez un ou plusieurs jeux :", all_games)
+            else:
+                 st.write("Chargement des jeux...")
+                 selected_games_multi = []
+        
+        with col_t2_filter2:
+            # Reuses the Code_postal logic from Tab 1 if column exists
+            if 'Code_postal' in gdf_bar.columns:
+                unique_zips = sorted(gdf_bar['Code_postal'].dropna().unique())
+                selected_zips_t2 = st.multiselect("Arrondissement", unique_zips, placeholder="Tous", key="filter_zip_t2")
+            else:
+                selected_zips_t2 = []
+
         if selected_games_multi:
-            # Find bars that have AT LEAST ONE of the selected games
-            # Or ALL? Usually users want to find a place that has "This OR That".
-            # If they want to play specific X AND Y, it's rarer but possible.
-            # Let's do OR for now (bars containing any of the selected).
-            
             bars_with_games = st.session_state.games_data[st.session_state.games_data['game'].isin(selected_games_multi)]['bar_name'].unique()
             map_data = gdf_bar[gdf_bar['Nom'].isin(bars_with_games)]
-            
-            st.info(f"{len(map_data)} bar(s) proposent ces jeux.")
         else:
-            # Show all if nothing selected? Or none?
-            # "afficher uniquement les bars correspondants" implies fitlering.
-            # Showing all by default is nicer visually.
             map_data = gdf_bar
-            st.markdown("*Sélectionnez des jeux pour filtrer la carte.*")
+            
+        # Apply Zip Filter
+        if selected_zips_t2:
+            map_data = map_data[map_data['Code_postal'].isin(selected_zips_t2)]
+            
+        if selected_games_multi:
+            st.info(f"{len(map_data)} bar(s) correspondent à vos critères.")
+        elif not selected_zips_t2:
+             st.markdown("*Sélectionnez des jeux pour filtrer la carte.*")
 
         col_map, col_results = st.columns([2, 1])
 
