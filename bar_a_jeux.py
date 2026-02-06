@@ -335,6 +335,13 @@ BAR_CSV_MAPPING = {
 def auto_commit_csv():
     repo_dir = os.path.dirname(os.path.abspath(__file__))
     
+    # Configure local git identity to avoid "Author identity unknown" error
+    try:
+        subprocess.run(['git', 'config', 'user.email', 'app@echec-map.com'], cwd=repo_dir, capture_output=True)
+        subprocess.run(['git', 'config', 'user.name', 'Echec Map Bot'], cwd=repo_dir, capture_output=True)
+    except:
+        pass
+
     # Check if git is initialized
     if not os.path.exists(os.path.join(repo_dir, ".git")):
         st.error("⚠️ Git n'est pas initialisé dans ce dossier.")
@@ -387,6 +394,10 @@ def save_users(users_list):
     # Auto-commit users.json
     repo_dir = os.path.dirname(os.path.abspath(__file__))
     try:
+        # Configure local git identity
+        subprocess.run(['git', 'config', 'user.email', 'app@echec-map.com'], cwd=repo_dir, capture_output=True)
+        subprocess.run(['git', 'config', 'user.name', 'Echec Map Bot'], cwd=repo_dir, capture_output=True)
+        
         subprocess.run(['git', 'add', 'users.json'], cwd=repo_dir, capture_output=True)
         subprocess.run(['git', 'commit', '-m', 'Update users'], cwd=repo_dir, capture_output=True)
     except:
