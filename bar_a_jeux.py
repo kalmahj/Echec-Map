@@ -370,7 +370,7 @@ def auto_commit_csv():
             else:
                 st.error(f"Git Commit Error: {result_commit.stderr}")
         else:
-            st.toast("✅ Sauvegardé et commité !", icon="💾")
+            st.toast("✅ Demande envoyée !", icon="💾")
             
     except FileNotFoundError:
         st.error("⚠️ Git n'est pas installé ou n'est pas dans le PATH.")
@@ -449,6 +449,32 @@ def get_available_icons():
         # List png files
         return glob.glob(os.path.join(ICONS_DIR, "*.png"))
     return []
+
+def load_insults():
+    """Load insults from file"""
+    insults_path = os.path.join(os.path.dirname(__file__), 'liste_insultes.txt')
+    if os.path.exists(insults_path):
+        try:
+            with open(insults_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                # Content is like ["word", "word", ...]
+                # We can safely eval it as it is a list of strings, or json load it
+                import ast
+                return ast.literal_eval(content)
+        except:
+            return []
+    return []
+
+def contains_profanity(text):
+    """Check if text contains profanity"""
+    if not text: return False
+    insults = load_insults()
+    text_lower = text.lower()
+    for insult in insults:
+        # Simple inclusion check
+        if insult.lower() in text_lower:
+            return True
+    return False
 
 # --- Login / Register Page ---
 def login_page():
@@ -621,11 +647,17 @@ def add_reaction(post_idx, emoji):
         st.session_state.forum_posts[post_idx]['reactions'] = {}
     
     reactions = st.session_state.forum_posts[post_idx]['reactions']
-    if isinstance(reactions, str):
+    
+    # FIX: Handle float/nan or string
+    if isinstance(reactions, float):
+        reactions = {}
+    elif isinstance(reactions, str):
         try:
             reactions = json.loads(reactions)
         except:
             reactions = {}
+    elif not isinstance(reactions, dict):
+        reactions = {}
     
     reactions[emoji] = reactions.get(emoji, 0) + 1
     st.session_state.forum_posts[post_idx]['reactions'] = json.dumps(reactions, ensure_ascii=False)
@@ -1242,23 +1274,27 @@ try:
             
             if st.form_submit_button("Publier"):
                 if message and game_choice:
-                    post = {
-                        'username': st.session_state.username,
-                        'user_icon': st.session_state.user_icon, # Store icon path with post
-                        'bar': bar_choice,
-                        'game': game_choice,
-                        'when': date_time,
-                        'message': message,
-                        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        'reported': False,
-                        'report_reason': '',
-                        'reactions': '',
-                        'comments': [] # Initialize as empty list
-                    }
-                    st.session_state.forum_posts.insert(0, post)
-                    save_forum_comment(post)
-                    st.success("✅ Publié")
-                    st.rerun()
+                    # Check profanity
+                    if contains_profanity(message) or contains_profanity(game_choice):
+                        st.error("⚠️ Votre message contient des termes inappropriés et n'a pas été publié.")
+                    else:
+                        post = {
+                            'username': st.session_state.username,
+                            'user_icon': st.session_state.user_icon, # Store icon path with post
+                            'bar': bar_choice,
+                            'game': game_choice,
+                            'when': date_time,
+                            'message': message,
+                            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            'reported': False,
+                            'report_reason': '',
+                            'reactions': '',
+                            'comments': [] # Initialize as empty list
+                        }
+                        st.session_state.forum_posts.insert(0, post)
+                        save_forum_comment(post)
+                        st.success("✅ Publié")
+                        st.rerun()
                 else:
                     st.error("Remplissez tous les champs")
         
@@ -1349,10 +1385,13 @@ try:
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # Delete comment button
-                            if st.button("🗑️", key=f"del_com_{idx}_{c_idx}"):
-                                delete_comment(idx, c_idx)
-                                st.rerun()
+                            # Delete comment button (Only comment author or admin/post author)
+                            is_comment_author = (comment.get('author') == st.session_state.username)
+                            
+                            if is_comment_author or is_admin:
+                                if st.button("🗑️", key=f"del_com_{idx}_{c_idx}"):
+                                    delete_comment(idx, c_idx)
+                                    st.rerun()
                     
                     # Add comment
                     with st.form(f"comment_{idx}"):
@@ -1370,11 +1409,15 @@ try:
                                 st.error("Message requis")
                 
                 with col2:
-                    # Post deletion
-                    if st.button("🗑️", key=f"del_post_{idx}", help="Supprimer mon post"):
-                        delete_forum_post(idx)
-                        st.success("Supprimé")
-                        st.rerun()
+                    # Post deletion - Only author or admin
+                    is_author = (post['username'] == st.session_state.username)
+                    is_admin = st.session_state.get('role') == 'admin'
+                    
+                    if is_author or is_admin:
+                        if st.button("🗑️", key=f"del_post_{idx}", help="Supprimer mon post"):
+                            delete_forum_post(idx)
+                            st.success("Supprimé")
+                            st.rerun()
                         
                     if not post.get('reported', False):
                         # Initialize report form state for this post if needed
