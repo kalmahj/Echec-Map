@@ -576,9 +576,14 @@ def load_games_from_csv():
                 
                 if 'Nom du jeu' in df.columns:
                     for game_name in df['Nom du jeu'].dropna().unique():
-                        # Clean artifacts
-                        clean_game = str(game_name).replace('arrow_right', '').replace('arrow_down', '').replace('->', '⬇').strip()
-                        games_list.append({'bar_name': bar_name, 'game': clean_game})
+                        # Aggressive cleaning: remove artifacts completely
+                        clean_game = str(game_name)
+                        for artifact in ['arrow_right', 'arrow_down', 'arrow_left', 'arrow_up', '->']:
+                            clean_game = clean_game.replace(artifact, '')
+                        clean_game = clean_game.strip()
+                        
+                        if clean_game: # Only add if not empty after cleaning
+                            games_list.append({'bar_name': bar_name, 'game': clean_game})
             except:
                 pass
     
@@ -765,8 +770,11 @@ def load_data():
     gdf_bar['lon'] = pd.to_numeric(gdf_bar['longitude'], errors='coerce')
     gdf_bar['lat'] = pd.to_numeric(gdf_bar['latitude'], errors='coerce')
     gdf_bar = gdf_bar[gdf_bar['Nom'].notna() & gdf_bar['lon'].notna() & gdf_bar['lat'].notna()]
-    # Clean up names globally
-    gdf_bar['Nom'] = gdf_bar['Nom'].astype(str).str.replace('arrow_right', '').str.replace('arrow_down', '').str.replace('->', '').str.strip()
+    # Clean up names globally - Aggressive
+    gdf_bar['Nom'] = gdf_bar['Nom'].astype(str)
+    for artifact in ['arrow_right', 'arrow_down', 'arrow_left', 'arrow_up', '->']:
+        gdf_bar['Nom'] = gdf_bar['Nom'].str.replace(artifact, '')
+    gdf_bar['Nom'] = gdf_bar['Nom'].str.strip()
     return gdf_bar
 
 try:
@@ -962,42 +970,64 @@ try:
             
             # NO SPECIFIC BAR SELECTED - Show list if filtered
             elif not filtered_gdf.empty and len(filtered_gdf) < len(gdf_bar):
-                st.markdown(f"### 📋 {len(filtered_gdf)} Bars trouvés")
+                st.markdown(f"### 📋 {len(filtered_gdf)} Bars dans cet arrondissement")
+                
+                # Iterate and show FULL details for each
                 for idx, row in filtered_gdf.iterrows():
-                    # Full Bar Card for List View
+                    bar_name = row['Nom']
+                    
+                    # --- REPLICATED DETAIL CARD LOGIC ---
                     st.markdown(f"""
-                    <div style="background-color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 5px solid #1E90FF;">
-                        <h3 style="margin-top:0; color: #003366;">{row['Nom']}</h3>
+                    <div style="background-color: white; padding: 20px; border-radius: 10px; margin-bottom: 30px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); border-top: 5px solid #1E90FF;">
+                        <h2 style="margin-top:0; color: #003366;">{bar_name}</h2>
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # Image
-                    b_img = find_best_image_match(row['Nom'], IMAGES_DIR)
-                    if b_img:
-                        st.image(b_img, use_container_width=True)
-                    
-                    st.write(f"📍 **{row['Adresse']}**")
-                    if pd.notna(row.get('Métro')): st.write(f"🚇 {row['Métro']}")
-                    
-                    c_btn1, c_btn2 = st.columns(2)
-                    with c_btn1:
-                        # Y Aller
-                        encoded_addr = row['Adresse'].replace(' ', '+')
-                        m_url = f"https://www.google.com/maps/search/?api=1&query={encoded_addr}"
-                        st.markdown(f"""
-                            <a href="{m_url}" target="_blank" style="text-decoration: none;">
-                                <div style="background-color:#34A853; color:white; padding:8px; border-radius:5px; text-align:center; font-weight:bold;">
-                                    🏃 Y Aller
-                                </div>
-                            </a>
+                    # 1. Image
+                    img_path = find_best_image_match(bar_name, IMAGES_DIR)
+                    if img_path:
+                        st.image(img_path, use_container_width=True)
+                    else:
+                         st.markdown("""
+                        <div style="background-color:#E6F3FF; height:200px; display:flex; align-items:center; justify-content:center; border-radius:10px; border: 2px dashed #1E90FF; margin-bottom: 20px;">
+                            <span style="color:#1E90FF; font-size:40px;">📷</span>
+                        </div>
                         """, unsafe_allow_html=True)
-                    with c_btn2:
-                        if st.button("👁️ Voir & Jeux", key=f"btn_see_full_{idx}"):
-                             st.session_state['search_bar_main'] = row['Nom']
-                             st.session_state['last_selected_bar'] = row['Nom']
-                             st.rerun()
+
+                    # 2. Info
+                    st.markdown(f"**📍 Adresse:** {row['Adresse']}")
+                    if pd.notna(row.get('Métro')): st.markdown(f"**🚇 Métro:** {row['Métro']}")
                     
-                    st.markdown("---")
+                    c_d1, c_d2 = st.columns(2)
+                    with c_d1:
+                        if pd.notna(row.get('Téléphone')): st.markdown(f"📞 {row['Téléphone']}")
+                    with c_d2:
+                        if pd.notna(row.get('Site')): st.markdown(f"🌐 [Site Web]({row['Site']})")
+
+                    # 3. Y Aller Button
+                    encoded_address = row['Adresse'].replace(' ', '+')
+                    maps_url = f"https://www.google.com/maps/search/?api=1&query={encoded_address}"
+                    st.markdown(f"""
+                        <a href="{maps_url}" target="_blank" style="text-decoration: none;">
+                            <button style="width:100%; background-color:#34A853; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; margin: 15px 0; font-size: 16px; transition: 0.3s;">
+                                🏃 Y ALLER (Itinéraire)
+                            </button>
+                        </a>
+                    """, unsafe_allow_html=True)
+                    
+                    # 4. Games List (Bullet points)
+                    st.markdown("### 🎲 Jeux Disponibles")
+                    bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == bar_name]
+                    
+                    if not bar_games.empty:
+                        games_list = sorted(bar_games['game'].tolist())
+                        with st.container(height=300):
+                            for g in games_list:
+                                st.markdown(f"- {g}")
+                    else:
+                        st.info("⚠️ Liste de jeux non disponible.")
+                    
+                    st.markdown("---") # Separator between bars
             else:
                  st.info("Aucun bar sélectionné. Choissisez un arrondissement pour voir la liste.")
 
