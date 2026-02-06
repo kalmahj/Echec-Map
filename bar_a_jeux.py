@@ -1183,10 +1183,8 @@ try:
                         st.info("Pas d'autres jeux disponibles.")
                     
                     st.markdown("---") # Separator between bars
-            
+        
             elif not selected_games_multi:
-                st.info("👈 Sélectionnez des jeux pour voir les bars qui les proposent.")
-            else:
                 st.warning("Aucun bar ne propose ces jeux.")
 
         st.markdown("---")
