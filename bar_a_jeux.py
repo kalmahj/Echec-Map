@@ -125,14 +125,10 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] {background-color: #E6F3FF; border-radius: 8px 8px 0 0;}
     .stTabs [aria-selected="true"] {background-color: #1E90FF !important; color: white !important;}
     
-    /* Sticky Header & Tabs */
+    /* Navigation Tabs - Normal Scrolling */
     div[data-testid="stVerticalBlock"] > div:has(div[data-baseweb="tab-list"]) {
-        position: sticky;
-        top: 0;
-        z-index: 999;
-        background-color: white;
+        /* No fixed positioning - natural scroll behavior */
         padding-top: 0.5rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
     
     /* Scroll Indicator Animation */
@@ -238,12 +234,9 @@ st.markdown("""
         .profile-header {
             justify-content: center;
         }
-        /* Make sure logo/header sticks well */
+        /* Logo/Header - Normal scrolling */
         div[data-testid="stVerticalBlock"] > div:has(h1) {
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            background: white;
+            /* No fixed positioning */
         }
     }
     
@@ -791,53 +784,52 @@ try:
     with tab1:
         st.subheader("🍷 Explorer la Carte des Bars")
         
-        # --- Filters ---
-        col_filters_1, col_filters_2 = st.columns([3, 1])
-        with col_filters_1:
-             # Search Bar (Autocomplete)
-             all_bar_names = sorted(gdf_bar['Nom'].tolist())
-             
-             # Determine default index based on last_selected_bar
-             default_idx = 0
-             if st.session_state.get('last_selected_bar') in all_bar_names:
-                 default_idx = all_bar_names.index(st.session_state['last_selected_bar']) + 1  # +1 for empty option
-             
-             search_query = st.selectbox("🔍 Rechercher un bar spécifique :", 
-                                        options=[""] + all_bar_names, 
-                                        index=default_idx,
-                                        key="search_bar_widget")
-             
-             # Sync widget selection to session state
-             if search_query:
-                 st.session_state['last_selected_bar'] = search_query
+        # Help Text - moved to top as requested
+        st.info("👈 Pour afficher les détails d'un bar, veuillez utiliser la **barre de recherche** (🔍) ou le filtre par arrondissement.")
         
-        with col_filters_2:
-            # Arrondissement Filter
-            # FIX: Use "Code postal" column directly from GeoJSON properties if available
-            if 'Code postal' in gdf_bar.columns:
-                 # Ensure it's string for consistent processing
-                 gdf_bar['Code_postal_clean'] = gdf_bar['Code postal'].astype(str)
-            else:
-                 # Fallback extraction
-                 gdf_bar['Code_postal_clean'] = gdf_bar['Adresse'].astype(str).str.extract(r'(75\d{3})')
-            
-            # Create arrondissement column for better display
-            gdf_bar['Arrondissement'] = gdf_bar['Code_postal_clean'].apply(extract_arrondissement)
-            
-            # Sort unique arrondissements
-            unique_arr = sorted(gdf_bar['Arrondissement'].dropna().unique(), key=lambda x: int(x.split('e')[0]))
-            selected_arr = st.multiselect("Arrondissement", unique_arr, placeholder="Tous")
-            
-            # Convert selected arrondissements back to postal codes for filtering
-            if selected_arr:
-                selected_zips = []
-                for arr in selected_arr:
-                    arr_num = int(arr.split('e')[0])
-                    selected_zips.append(f"750{arr_num:02d}")
-            else:
-                selected_zips = []
+        # --- Search Bar ---
+        all_bar_names = sorted(gdf_bar['Nom'].tolist())
         
-        # --- Closest Bar Feature (Always Visible) ---
+        # Determine default index based on last_selected_bar
+        default_idx = 0
+        if st.session_state.get('last_selected_bar') in all_bar_names:
+            default_idx = all_bar_names.index(st.session_state['last_selected_bar']) + 1  # +1 for empty option
+        
+        search_query = st.selectbox("🔍 Rechercher un bar spécifique :", 
+                                   options=[""] + all_bar_names, 
+                                   index=default_idx,
+                                   key="search_bar_widget")
+        
+        # Sync widget selection to session state
+        if search_query:
+            st.session_state['last_selected_bar'] = search_query
+        
+        # --- Arrondissement Filter ---
+        # FIX: Use "Code postal" column directly from GeoJSON properties if available
+        if 'Code postal' in gdf_bar.columns:
+            # Ensure it's string for consistent processing
+            gdf_bar['Code_postal_clean'] = gdf_bar['Code postal'].astype(str)
+        else:
+            # Fallback extraction
+            gdf_bar['Code_postal_clean'] = gdf_bar['Adresse'].astype(str).str.extract(r'(75\d{3})')
+        
+        # Create arrondissement column for better display
+        gdf_bar['Arrondissement'] = gdf_bar['Code_postal_clean'].apply(extract_arrondissement)
+        
+        # Sort unique arrondissements
+        unique_arr = sorted(gdf_bar['Arrondissement'].dropna().unique(), key=lambda x: int(x.split('e')[0]))
+        selected_arr = st.multiselect("📍 Arrondissement", unique_arr, placeholder="Tous les arrondissements")
+        
+        # Convert selected arrondissements back to postal codes for filtering
+        if selected_arr:
+            selected_zips = []
+            for arr in selected_arr:
+                arr_num = int(arr.split('e')[0])
+                selected_zips.append(f"750{arr_num:02d}")
+        else:
+            selected_zips = []
+        
+        # --- Closest Bar Feature ---
         st.markdown("### 📍 Trouver le bar le plus proche de moi")
         col_addr, col_btn = st.columns([3, 1])
         with col_addr:
@@ -889,9 +881,6 @@ try:
              map_zoom = 12
 
         # --- Layout: Map (Left/Center) | Details (Right) ---
-        
-        # Help Text (moved above columns as requested)
-        st.info("👈 Pour afficher les détails d'un bar, veuillez utiliser la **barre de recherche** (🔍) ou le filtre par arrondissement.")
 
         col_map, col_details = st.columns([2, 1])
         
