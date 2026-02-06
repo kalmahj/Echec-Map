@@ -773,6 +773,29 @@ def load_data():
 try:
     gdf_bar = load_data()
     
+    # --- Assign 100 random games to bars without games ---
+    import random
+    all_bar_names = gdf_bar['Nom'].tolist()
+    bars_with_games = st.session_state.games_data['bar_name'].unique().tolist() if not st.session_state.games_data.empty else []
+    bars_without_games = [b for b in all_bar_names if b not in bars_with_games]
+    
+    if bars_without_games and not st.session_state.games_data.empty:
+        all_available_games = st.session_state.games_data['game'].unique().tolist()
+        new_entries = []
+        for bar_name in bars_without_games:
+            # Assign 100 random games (or all if less than 100)
+            if len(all_available_games) > 100:
+                random_games = random.sample(all_available_games, 100)
+            else:
+                random_games = all_available_games
+            for game in random_games:
+                new_entries.append({'bar_name': bar_name, 'game': game})
+        
+        # Add to games_data
+        if new_entries:
+            new_df = pd.DataFrame(new_entries)
+            st.session_state.games_data = pd.concat([st.session_state.games_data, new_df], ignore_index=True)
+    
     # Tabs 
     if st.session_state.admin_logged_in:
         tab1, tab2, tab3, tab4 = st.tabs(["🍷 Les Bars", "🎲 Les Jeux", "💬 Forum", "🔧 Admin"])
@@ -957,24 +980,10 @@ try:
                     st.markdown("### 🎲 Jeux Disponibles")
                     bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == selected_bar_name]
                     
-                    if not bar_games.empty:
-                        games_list = sorted(bar_games['game'].tolist())
-                        with st.container(height=300):
-                            for g in games_list:
-                                st.markdown(f"- {g}")
-                    else:
-                        # Show 100 random games from other bars
-                        st.info("⚠️ Liste de jeux non disponible pour ce bar. Voici 100 jeux disponibles dans d'autres bars :")
-                        all_available_games = st.session_state.games_data['game'].unique().tolist()
-                        if len(all_available_games) > 100:
-                            import random
-                            random_games = random.sample(all_available_games, 100)
-                        else:
-                            random_games = all_available_games
-                        random_games = sorted(random_games)
-                        with st.container(height=300):
-                            for g in random_games:
-                                st.markdown(f"- {g}")
+                    games_list = sorted(bar_games['game'].tolist()) if not bar_games.empty else []
+                    with st.container(height=300):
+                        for g in games_list:
+                            st.markdown(f"- {g}")
             
             # NO SPECIFIC BAR SELECTED - Show list if filtered
             elif not filtered_gdf.empty and len(filtered_gdf) < len(gdf_bar):
@@ -1032,19 +1041,6 @@ try:
                         with st.container(height=300):
                             for g in games_list:
                                 st.markdown(f"- {g}")
-                    else:
-                        # Show 100 random games from other bars
-                        st.info("⚠️ Liste de jeux non disponible pour ce bar. Voici 100 jeux disponibles dans d'autres bars :")
-                        all_available_games = st.session_state.games_data['game'].unique().tolist()
-                        if len(all_available_games) > 100:
-                            import random
-                            random_games = random.sample(all_available_games, 100)
-                        else:
-                            random_games = all_available_games
-                        random_games = sorted(random_games)
-                        with st.container(height=300):
-                            for g in random_games:
-                                st.markdown(f"- {g}")
                     
                     st.markdown("---") # Separator between bars
             else:
@@ -1065,22 +1061,6 @@ try:
         else:
             st.write("Chargement des jeux...")
             selected_games_multi = []
-        
-        # --- Arrondissement Filter ---
-        if 'Arrondissement' in gdf_bar.columns:
-            unique_arr_t2 = sorted(gdf_bar['Arrondissement'].dropna().unique(), key=lambda x: int(x.split('e')[0]))
-            selected_arr_t2 = st.multiselect("📍 Arrondissement", unique_arr_t2, placeholder="Tous les arrondissements", key="arr_filter_t2")
-            
-            # Convert to postal codes
-            if selected_arr_t2:
-                selected_zips_t2 = []
-                for arr in selected_arr_t2:
-                    arr_num = int(arr.split('e')[0])
-                    selected_zips_t2.append(f"750{arr_num:02d}")
-            else:
-                selected_zips_t2 = []
-        else:
-            selected_zips_t2 = []
 
         # --- Filter Data ---
         if selected_games_multi:
@@ -1088,10 +1068,6 @@ try:
             map_data = gdf_bar[gdf_bar['Nom'].isin(bars_with_games)]
         else:
             map_data = gdf_bar
-            
-        # Apply Arrondissement Filter
-        if selected_zips_t2 and 'Code_postal_clean' in map_data.columns:
-            map_data = map_data[map_data['Code_postal_clean'].isin(selected_zips_t2)]
             
         if selected_games_multi:
             st.info(f"🎯 {len(map_data)} bar(s) proposent les jeux sélectionnés.")
@@ -1104,7 +1080,13 @@ try:
             center_lat = map_data['lat'].mean() if len(map_data) > 0 else 48.8566
             center_lon = map_data['lon'].mean() if len(map_data) > 0 else 2.3522
 
-            m = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB dark_matter", scrollWheelZoom=False)
+            m = folium.Map(
+                location=[center_lat, center_lon], 
+                zoom_start=12, 
+                tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                attr='Google',
+                scrollWheelZoom=False
+            )
             
             for idx, row in map_data.iterrows():
                 bar_games_count = len(st.session_state.games_data[st.session_state.games_data['bar_name'] == row['Nom']])
