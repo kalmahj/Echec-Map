@@ -909,13 +909,7 @@ try:
         with col_map:
             # Scroll Indicator REMOVED (as requested implicitly by "Infos plus bas" removal, replaced by side panel focus)
             
-           m = folium.Map(
-                location=map_center, 
-                zoom_start=map_zoom, 
-                tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', 
-                attr='Google',
-                scrollWheelZoom=False
-            )   
+            m = folium.Map(location=map_center, zoom_start=map_zoom, tiles="CartoDB dark_matter", scrollWheelZoom=False)
             
             # Add markers
             for idx, row in filtered_gdf.iterrows():
@@ -1086,13 +1080,7 @@ try:
             center_lat = map_data['lat'].mean() if len(map_data) > 0 else 48.8566
             center_lon = map_data['lon'].mean() if len(map_data) > 0 else 2.3522
 
-            m = folium.Map(
-                location=[center_lat, center_lon], 
-                zoom_start=12, 
-                tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-                attr='Google',
-                scrollWheelZoom=False
-            )
+            m = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB dark_matter", scrollWheelZoom=False)
             
             for idx, row in map_data.iterrows():
                 bar_games_count = len(st.session_state.games_data[st.session_state.games_data['bar_name'] == row['Nom']])
