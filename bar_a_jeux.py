@@ -830,10 +830,9 @@ try:
             selected_zips = []
         
         # --- Closest Bar Feature ---
-        st.markdown("### 📍 Trouver le bar le plus proche de moi")
         col_addr, col_btn = st.columns([3, 1])
         with col_addr:
-            user_address = st.text_input("Entrez votre adresse ici :", placeholder="ex: Tour Eiffel, Paris")
+            user_address = st.text_input("Trouvez votre bar le plus proche en entrant votre adresse", placeholder="ex: 60 Avenue Emile Zola, Paris")
         with col_btn:
             st.write("") # Spacer
             if st.button("Trouver", use_container_width=True):
@@ -949,7 +948,7 @@ try:
                     st.markdown(f"""
                         <a href="{maps_url}" target="_blank" style="text-decoration: none;">
                             <button style="width:100%; background-color:#34A853; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; margin: 15px 0; font-size: 16px; transition: 0.3s;">
-                                🏃 Y ALLER (Itinéraire)
+                                🏃 J'y vais ! (Itinéraire Google Maps)
                             </button>
                         </a>
                     """, unsafe_allow_html=True)
