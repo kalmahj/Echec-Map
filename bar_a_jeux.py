@@ -672,6 +672,16 @@ if not st.session_state.logged_in:
 
 st.markdown("---")
 
+def extract_arrondissement(code_postal):
+    """Extraire l'arrondissement à partir du code postal (75002 -> 2e arr.)"""
+    if pd.isna(code_postal):
+        return None
+    code_str = str(code_postal)
+    if code_str.startswith('75') and len(code_str) == 5:
+        arr_num = int(code_str[3:])
+        return f"{arr_num}e arr."
+    return None
+
 @st.cache_data
 def load_data():
     gdf_bar = gpd.read_file("liste_bar_OK.geojson")
@@ -711,9 +721,22 @@ try:
                  # Extract 5 digits starting with 75
                  gdf_bar['Code_postal'] = gdf_bar['Adresse'].astype(str).str.extract(r'(75\d{3})')
             
-            # Sort unique zips
-            unique_zips = sorted(gdf_bar['Code_postal'].dropna().unique())
-            selected_zips = st.multiselect("Arrondissement", unique_zips, placeholder="Tous")
+            # Create arrondissement column for better display
+            if 'Arrondissement' not in gdf_bar.columns:
+                gdf_bar['Arrondissement'] = gdf_bar['Code_postal'].apply(extract_arrondissement)
+            
+            # Sort unique arrondissements
+            unique_arr = sorted(gdf_bar['Arrondissement'].dropna().unique(), key=lambda x: int(x.split('e')[0]))
+            selected_arr = st.multiselect("Arrondissement", unique_arr, placeholder="Tous")
+            
+            # Convert selected arrondissements back to postal codes for filtering
+            if selected_arr:
+                selected_zips = []
+                for arr in selected_arr:
+                    arr_num = int(arr.split('e')[0])
+                    selected_zips.append(f"750{arr_num:02d}")
+            else:
+                selected_zips = []
 
         # --- Filter Data ---
         filtered_gdf = gdf_bar.copy()
@@ -750,6 +773,9 @@ try:
         col_map, col_details = st.columns([2, 1])
         
         with col_map:
+            # Scroll Indicator ABOVE Map
+            st.markdown('<div class="scroll-indicator">⬇️ Infos plus bas ⬇️</div>', unsafe_allow_html=True)
+            
             m = folium.Map(location=map_center, zoom_start=map_zoom, tiles="CartoDB dark_matter", scrollWheelZoom=False)
             
             # Add markers
@@ -765,9 +791,6 @@ try:
             
             # Display Map & Capture Returns
             map_return = st_folium(m, width="100%", height=600, key="main_map")
-            
-            # Scroll Indicator BELOW Map
-            st.markdown('<div class="scroll-indicator">⬇️ Infos plus bas ⬇️</div>', unsafe_allow_html=True)
             
             # Handle Click Events
             if map_return and map_return.get("last_object_clicked"):
@@ -841,6 +864,62 @@ try:
                         st.info("⚠️ Liste de jeux non disponible.")
             else:
                 st.info("👈 Cliquez sur un pin ou utilisez la recherche pour voir les détails.")
+        
+        # --- Section d'informations en bas de la page (pour les clics sur pins) ---
+        st.markdown("---")
+        st.markdown("### 📍 Informations du Bar Sélectionné")
+        
+        if current_selection:
+            # Find data
+            bar_match = gdf_bar[gdf_bar['Nom'] == current_selection]
+            if not bar_match.empty:
+                bar_data = bar_match.iloc[0]
+                
+                col_info_left, col_info_right = st.columns([1, 2])
+                
+                with col_info_left:
+                    # Image
+                    img_path = find_best_image_match(current_selection, IMAGES_DIR)
+                    if img_path:
+                        st.image(img_path, use_container_width=True)
+                    else:
+                        st.markdown("""
+                        <div style="background-color:#E6F3FF; height:200px; display:flex; align-items:center; justify-content:center; border-radius:10px; border: 2px dashed #1E90FF;">
+                            <span style="color:#1E90FF; font-size:40px;">📷</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                with col_info_right:
+                    # Title & Info
+                    st.markdown(f"## {current_selection}")
+                    st.markdown(f"📍 **Adresse:** {bar_data['Adresse']}")
+                    if pd.notna(bar_data.get('Métro')): 
+                        st.markdown(f"🚇 **Métro:** {bar_data['Métro']}")
+                    
+                    # Y Aller Button
+                    encoded_address = bar_data['Adresse'].replace(' ', '+')
+                    maps_url = f"https://www.google.com/maps/search/?api=1&query={encoded_address}"
+                    st.markdown(f"""
+                        <a href="{maps_url}" target="_blank" style="text-decoration: none;">
+                            <button style="width:100%; background-color:#34A853; color:white; padding:10px; border:none; border-radius:5px; font-weight:bold; cursor:pointer; margin: 10px 0;">
+                                🏃 Y ALLER
+                            </button>
+                        </a>
+                    """, unsafe_allow_html=True)
+                    
+                    # Games List
+                    st.markdown("### 🎲 Jeux Disponibles")
+                    bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == current_selection]
+                    
+                    if not bar_games.empty:
+                        games_list = sorted(bar_games['game'].tolist())
+                        with st.container(height=300):
+                            for g in games_list:
+                                st.markdown(f"- {g}")
+                    else:
+                        st.info("⚠️ Liste de jeux non disponible.")
+        else:
+            st.info("👆 Sélectionnez un bar sur la carte pour voir ses informations détaillées ici.")
 
     # TAB 2: LES JEUX (Recherche croisée)
     with tab2:
