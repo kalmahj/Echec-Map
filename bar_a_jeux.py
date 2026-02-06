@@ -827,30 +827,30 @@ try:
             else:
                 selected_zips = []
         
-        # --- Closest Bar Feature ---
-        with st.expander("📍 Trouver le bar le plus proche de moi"):
-            col_addr, col_btn = st.columns([3, 1])
-            with col_addr:
-                user_address = st.text_input("Entrez votre adresse ici :", placeholder="ex: Tour Eiffel, Paris")
-            with col_btn:
-                st.write("") # Spacer
-                if st.button("Trouver", use_container_width=True):
-                    if user_address:
-                        with st.spinner("Recherche en cours..."):
-                            coords = get_coordinates(user_address)
-                            if coords:
-                                u_lat, u_lon = coords
-                                closest_name, dist = find_closest_bar(u_lat, u_lon, gdf_bar)
-                                if closest_name:
-                                    st.success(f"Le bar le plus proche est : **{closest_name}** ({dist:.2f} km)")
-                                    # Update state to select this bar matching the logic below
-                                    st.session_state['search_bar_main'] = closest_name
-                                    st.session_state['last_selected_bar'] = closest_name
-                                    st.rerun()
-                            else:
-                                st.error("Adresse introuvable.")
-                    else:
-                        st.warning("Veuillez entrer une adresse.")
+        # --- Closest Bar Feature (Always Visible) ---
+        st.markdown("### 📍 Trouver le bar le plus proche de moi")
+        col_addr, col_btn = st.columns([3, 1])
+        with col_addr:
+            user_address = st.text_input("Entrez votre adresse ici :", placeholder="ex: Tour Eiffel, Paris")
+        with col_btn:
+            st.write("") # Spacer
+            if st.button("Trouver", use_container_width=True):
+                if user_address:
+                    with st.spinner("Recherche en cours..."):
+                        coords = get_coordinates(user_address)
+                        if coords:
+                            u_lat, u_lon = coords
+                            closest_name, dist = find_closest_bar(u_lat, u_lon, gdf_bar)
+                            if closest_name:
+                                st.success(f"Le bar le plus proche est : **{closest_name}** ({dist:.2f} km)")
+                                # Update state to select this bar matching the logic below
+                                st.session_state['search_bar_main'] = closest_name
+                                st.session_state['last_selected_bar'] = closest_name
+                                st.rerun()
+                        else:
+                            st.error("Adresse introuvable.")
+                else:
+                    st.warning("Veuillez entrer une adresse.")
 
         # --- Filter Data ---
         filtered_gdf = gdf_bar.copy()
