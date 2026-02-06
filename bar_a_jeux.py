@@ -764,6 +764,8 @@ def load_data():
     gdf_bar['lon'] = pd.to_numeric(gdf_bar['longitude'], errors='coerce')
     gdf_bar['lat'] = pd.to_numeric(gdf_bar['latitude'], errors='coerce')
     gdf_bar = gdf_bar[gdf_bar['Nom'].notna() & gdf_bar['lon'].notna() & gdf_bar['lat'].notna()]
+    # Clean up names globally
+    gdf_bar['Nom'] = gdf_bar['Nom'].astype(str).str.replace('arrow_right', '').str.replace('arrow_down', '').str.replace('->', '').str.strip()
     return gdf_bar
 
 try:
@@ -869,6 +871,10 @@ try:
              map_zoom = 12
 
         # --- Layout: Map (Left/Center) | Details (Right) ---
+        
+        # Help Text (moved above columns as requested)
+        st.info("👈 Pour afficher les détails d'un bar, veuillez utiliser la **barre de recherche** (🔍) ou le filtre par arrondissement.")
+
         col_map, col_details = st.columns([2, 1])
         
         with col_map:
@@ -952,8 +958,21 @@ try:
                                 st.markdown(f"- {g}")
                     else:
                         st.info("⚠️ Liste de jeux non disponible.")
+            
+            # NO SPECIFIC BAR SELECTED - Show list if filtered
+            elif not filtered_gdf.empty and len(filtered_gdf) < len(gdf_bar):
+                st.markdown(f"### 📋 {len(filtered_gdf)} Bars trouvés")
+                for idx, row in filtered_gdf.iterrows():
+                    with st.expander(f"📍 {row['Nom']}"):
+                        st.write(f"🏠 {row['Adresse']}")
+                        if pd.notna(row.get('Métro')): st.write(f"🚇 {row['Métro']}")
+                        # Button to select this bar details
+                        if st.button("Voir détails", key=f"btn_see_{idx}"):
+                             st.session_state['search_bar_main'] = row['Nom']
+                             st.session_state['last_selected_bar'] = row['Nom']
+                             st.rerun()
             else:
-                st.info("👈 Pour afficher les détails d'un bar, veuillez utiliser la **barre de recherche** (🔍) ou le filtre par arrondissement.")
+                 st.info("Aucun bar sélectionné. Choissisez un arrondissement pour voir la liste.")
 
 
     # TAB 2: LES JEUX (Recherche croisée)
