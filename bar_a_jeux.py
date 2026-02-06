@@ -785,7 +785,7 @@ try:
         st.subheader("🍷 Explorer la Carte des Bars")
         
         # Help Text - moved to top as requested
-        st.info("Utilisez les filtres ci-dessous pour naviguer la carte.")
+        st.markdown('<div class="scroll-indicator">⬇️ Résultats plus bas ⬇️</div>', unsafe_allow_html=True)
         
         # --- Search Bar ---
         all_bar_names = sorted(gdf_bar['Nom'].tolist())
