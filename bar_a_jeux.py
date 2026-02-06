@@ -785,7 +785,7 @@ try:
         st.subheader("🍷 Explorer la Carte des Bars")
         
         # Help Text - moved to top as requested
-        st.info("👈 Pour afficher les détails d'un bar, veuillez utiliser la **barre de recherche** (🔍) ou le filtre par arrondissement.")
+        st.info("Utilisez les filtres ci-dessous pour naviguer la carte.")
         
         # --- Search Bar ---
         all_bar_names = sorted(gdf_bar['Nom'].tolist())
@@ -832,7 +832,7 @@ try:
         # --- Closest Bar Feature ---
         col_addr, col_btn = st.columns([3, 1])
         with col_addr:
-            user_address = st.text_input("Trouvez votre bar le plus proche en entrant votre adresse", placeholder="ex: 60 Avenue Emile Zola, Paris")
+            user_address = st.text_input("📍 Trouvez votre bar le plus proche en entrant votre adresse", placeholder="ex: 60 Avenue Emile Zola, Paris")
         with col_btn:
             st.write("") # Spacer
             if st.button("Trouver", use_container_width=True):
