@@ -17,6 +17,9 @@ import glob
 import base64
 import difflib
 import unicodedata
+from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut
+from math import radians, cos, sin, asin, sqrt
 
 LOGO_PATH = os.path.join(os.path.dirname(__file__), 'logo.png')
 # Update path to point to the nested directory as discovered
@@ -27,6 +30,49 @@ def normalize_string(s):
     if not isinstance(s, str): return ""
     ns = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8')
     return ns.lower().strip().replace(' ', '_').replace('-', '_')
+
+def haversine(lon1, lat1, lon2, lat2):
+    """
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees)
+    """
+    # convert decimal degrees to radians 
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+
+    # haversine formula 
+    dlon = lon2 - lon1 
+    dlat = lat2 - lat1 
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a)) 
+    r = 6371 # Radius of earth in kilometers.
+    return c * r
+
+def get_coordinates(address):
+    geo_locator = Nominatim(user_agent="echec_map_app")
+    try:
+        location = geo_locator.geocode(address)
+        if location:
+            return location.latitude, location.longitude
+        return None
+    except GeocoderTimedOut:
+        return None
+
+def find_closest_bar(user_lat, user_lon, df):
+    min_dist = float('inf')
+    closest_bar = None
+    
+    for _, row in df.iterrows():
+        try:
+            bar_lat = float(row['lat'])
+            bar_lon = float(row['lon'])
+            dist = haversine(user_lon, user_lat, bar_lon, bar_lat)
+            if dist < min_dist:
+                min_dist = dist
+                closest_bar = row['Nom']
+        except:
+            continue
+            
+    return closest_bar, min_dist
 
 def find_best_image_match(bar_name, images_dir):
     """Find the best matching image file for a given bar name using fuzzy matching."""
@@ -737,6 +783,31 @@ try:
                     selected_zips.append(f"750{arr_num:02d}")
             else:
                 selected_zips = []
+        
+        # --- Closest Bar Feature ---
+        with st.expander("📍 Trouver le bar le plus proche de moi"):
+            col_addr, col_btn = st.columns([3, 1])
+            with col_addr:
+                user_address = st.text_input("Entrez votre adresse ici :", placeholder="ex: Tour Eiffel, Paris")
+            with col_btn:
+                st.write("") # Spacer
+                if st.button("Trouver", use_container_width=True):
+                    if user_address:
+                        with st.spinner("Recherche en cours..."):
+                            coords = get_coordinates(user_address)
+                            if coords:
+                                u_lat, u_lon = coords
+                                closest_name, dist = find_closest_bar(u_lat, u_lon, gdf_bar)
+                                if closest_name:
+                                    st.success(f"Le bar le plus proche est : **{closest_name}** ({dist:.2f} km)")
+                                    # Update state to select this bar matching the logic below
+                                    st.session_state['search_bar_main'] = closest_name
+                                    st.session_state['last_selected_bar'] = closest_name
+                                    st.rerun()
+                            else:
+                                st.error("Adresse introuvable.")
+                    else:
+                        st.warning("Veuillez entrer une adresse.")
 
         # --- Filter Data ---
         filtered_gdf = gdf_bar.copy()
@@ -754,10 +825,6 @@ try:
              if st.session_state.get('last_selected_bar') != st.session_state['search_bar_main']:
                  st.session_state['last_selected_bar'] = st.session_state['search_bar_main']
         
-        # When map click updates 'last_selected_bar', we need widget to reflect it.
-        # This is handled by passing 'key="search_bar_main"' to selectbox AND updating that key in session_state on click.
-        # But we must ensure precedence. A map click triggers a rerun. The widget will read the updated key.
-        
         current_selection = st.session_state.get('last_selected_bar', "")
         
         # Map Center Logic
@@ -773,8 +840,7 @@ try:
         col_map, col_details = st.columns([2, 1])
         
         with col_map:
-            # Scroll Indicator ABOVE Map
-            st.markdown('<div class="scroll-indicator">⬇️ Infos plus bas ⬇️</div>', unsafe_allow_html=True)
+            # Scroll Indicator REMOVED (as requested implicitly by "Infos plus bas" removal, replaced by side panel focus)
             
             m = folium.Map(location=map_center, zoom_start=map_zoom, tiles="CartoDB dark_matter", scrollWheelZoom=False)
             
@@ -792,30 +858,40 @@ try:
             # Display Map & Capture Returns
             map_return = st_folium(m, width="100%", height=600, key="main_map")
             
-            # Handle Click Events
+            # Handle Click Events - ROBUST FIX
             if map_return and map_return.get("last_object_clicked"):
                 clicked_pos = map_return["last_object_clicked"]
-                # Find bar with this position
-                clicked_bar = filtered_gdf[
-                    ((filtered_gdf['lat'] - clicked_pos['lat']).abs() < 0.0001) & 
-                    ((filtered_gdf['lon'] - clicked_pos['lng']).abs() < 0.0001)
-                ]
-                
-                if not clicked_bar.empty:
-                    selected_name = clicked_bar.iloc[0]['Nom']
-                    # Use session state to manage sync.
-                    # This ensures next rerun has the correct bar selected in widget too.
-                    if st.session_state.get('search_bar_main') != selected_name:
-                         st.session_state['search_bar_main'] = selected_name
-                         st.session_state['last_selected_bar'] = selected_name
-                         st.rerun()
+                if clicked_pos:
+                    # Find bar with this position with a slightly wider tolerance or exact match logic
+                    # Calculate distance to all bars and pick closest one within a small threshold
+                    # This avoids floating point exact match issues
+                    
+                    clicked_lat = float(clicked_pos['lat'])
+                    clicked_lng = float(clicked_pos['lng'])
+                    
+                    # Find closest bar to click in the whole dataset (not just filtered, just in case)
+                    # Use a simple Euclidean distance on coords for speed appropriate at this scale
+                    # or re-use closest matching logic locally
+                    
+                    candidates = filtered_gdf.copy()
+                    candidates['dist_click'] = ((candidates['lat'] - clicked_lat)**2 + (candidates['lon'] - clicked_lng)**2)**0.5
+                    
+                    # Threshold: approx 50 meters or so. 0.0001 deg is roughly 11 meters lat.
+                    # Let's say 0.0005 to catch the pin click safely.
+                    match = candidates[candidates['dist_click'] < 0.0005].sort_values('dist_click')
+                    
+                    if not match.empty:
+                        selected_name = match.iloc[0]['Nom']
+                        
+                        # Only rerun if it's a NEW selection to avoid loops
+                        if st.session_state.get('last_selected_bar') != selected_name:
+                             st.session_state['search_bar_main'] = selected_name
+                             st.session_state['last_selected_bar'] = selected_name
+                             st.rerun()
 
         with col_details:
             # We use the session state directly
             selected_bar_name = st.session_state.get('last_selected_bar')
-            
-            # If search query was used (from top), it updates state. 
-            # But here we just read state.
             
             if selected_bar_name:
                 # Find data
@@ -823,30 +899,41 @@ try:
                 if not bar_match.empty:
                     bar_data = bar_match.iloc[0]
                     
+                    # Stylish Card for Details
+                    st.markdown(f"""
+                    <div style="background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 5px solid #1E90FF;">
+                        <h2 style="margin-top:0; color: #003366;">{selected_bar_name}</h2>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
                     # 1. Image
                     img_path = find_best_image_match(selected_bar_name, IMAGES_DIR)
                     if img_path:
                         st.image(img_path, use_container_width=True)
                     else:
-                        # Placeholder
                         st.markdown("""
-                        <div style="background-color:#E6F3FF; height:200px; display:flex; align-items:center; justify-content:center; border-radius:10px; border: 2px dashed #1E90FF;">
+                        <div style="background-color:#E6F3FF; height:200px; display:flex; align-items:center; justify-content:center; border-radius:10px; border: 2px dashed #1E90FF; margin-bottom: 20px;">
                             <span style="color:#1E90FF; font-size:40px;">📷</span>
                         </div>
                         """, unsafe_allow_html=True)
 
-                    # 2. Title & Info
-                    st.markdown(f"## {selected_bar_name}")
-                    st.markdown(f"📍 **Adresse:** {bar_data['Adresse']}")
-                    if pd.notna(bar_data.get('Métro')): st.markdown(f"🚇 **Métro:** {bar_data['Métro']}")
+                    # 2. Info
+                    st.markdown(f"**📍 Adresse:** {bar_data['Adresse']}")
+                    if pd.notna(bar_data.get('Métro')): st.markdown(f"**🚇 Métro:** {bar_data['Métro']}")
                     
+                    col_det_1, col_det_2 = st.columns(2)
+                    with col_det_1:
+                        if pd.notna(bar_data.get('Téléphone')): st.markdown(f"📞 {bar_data['Téléphone']}")
+                    with col_det_2:
+                         if pd.notna(bar_data.get('Site')): st.markdown(f"🌐 [Site Web]({bar_data['Site']})")
+
                     # 3. Y Aller Button
                     encoded_address = bar_data['Adresse'].replace(' ', '+')
                     maps_url = f"https://www.google.com/maps/search/?api=1&query={encoded_address}"
                     st.markdown(f"""
                         <a href="{maps_url}" target="_blank" style="text-decoration: none;">
-                            <button style="width:100%; background-color:#34A853; color:white; padding:10px; border:none; border-radius:5px; font-weight:bold; cursor:pointer; margin: 10px 0;">
-                                🏃 Y ALLER
+                            <button style="width:100%; background-color:#34A853; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; margin: 15px 0; font-size: 16px; transition: 0.3s;">
+                                🏃 Y ALLER (Itinéraire)
                             </button>
                         </a>
                     """, unsafe_allow_html=True)
@@ -863,63 +950,8 @@ try:
                     else:
                         st.info("⚠️ Liste de jeux non disponible.")
             else:
-                st.info("👈 Cliquez sur un pin ou utilisez la recherche pour voir les détails.")
-        
-        # --- Section d'informations en bas de la page (pour les clics sur pins) ---
-        st.markdown("---")
-        st.markdown("### 📍 Informations du Bar Sélectionné")
-        
-        if current_selection:
-            # Find data
-            bar_match = gdf_bar[gdf_bar['Nom'] == current_selection]
-            if not bar_match.empty:
-                bar_data = bar_match.iloc[0]
-                
-                col_info_left, col_info_right = st.columns([1, 2])
-                
-                with col_info_left:
-                    # Image
-                    img_path = find_best_image_match(current_selection, IMAGES_DIR)
-                    if img_path:
-                        st.image(img_path, use_container_width=True)
-                    else:
-                        st.markdown("""
-                        <div style="background-color:#E6F3FF; height:200px; display:flex; align-items:center; justify-content:center; border-radius:10px; border: 2px dashed #1E90FF;">
-                            <span style="color:#1E90FF; font-size:40px;">📷</span>
-                        </div>
-                        """, unsafe_allow_html=True)
-                
-                with col_info_right:
-                    # Title & Info
-                    st.markdown(f"## {current_selection}")
-                    st.markdown(f"📍 **Adresse:** {bar_data['Adresse']}")
-                    if pd.notna(bar_data.get('Métro')): 
-                        st.markdown(f"🚇 **Métro:** {bar_data['Métro']}")
-                    
-                    # Y Aller Button
-                    encoded_address = bar_data['Adresse'].replace(' ', '+')
-                    maps_url = f"https://www.google.com/maps/search/?api=1&query={encoded_address}"
-                    st.markdown(f"""
-                        <a href="{maps_url}" target="_blank" style="text-decoration: none;">
-                            <button style="width:100%; background-color:#34A853; color:white; padding:10px; border:none; border-radius:5px; font-weight:bold; cursor:pointer; margin: 10px 0;">
-                                🏃 Y ALLER
-                            </button>
-                        </a>
-                    """, unsafe_allow_html=True)
-                    
-                    # Games List
-                    st.markdown("### 🎲 Jeux Disponibles")
-                    bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == current_selection]
-                    
-                    if not bar_games.empty:
-                        games_list = sorted(bar_games['game'].tolist())
-                        with st.container(height=300):
-                            for g in games_list:
-                                st.markdown(f"- {g}")
-                    else:
-                        st.info("⚠️ Liste de jeux non disponible.")
-        else:
-            st.info("👆 Sélectionnez un bar sur la carte pour voir ses informations détaillées ici.")
+                st.info("👈 Cliquez sur un pin ou utilisez la barre de recherche pour afficher les détails du bar ici.")
+
 
     # TAB 2: LES JEUX (Recherche croisée)
     with tab2:
