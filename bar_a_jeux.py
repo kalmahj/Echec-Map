@@ -286,6 +286,20 @@ if 'user_icon' not in st.session_state:
 if 'role' not in st.session_state:
     st.session_state.role = "user"
 
+# Session Persistence Check
+if not st.session_state.logged_in:
+    # Check if user is in query params
+    qp = st.query_params
+    if "session_user" in qp:
+        saved_user = qp["session_user"]
+        # We need to load users to verify/get details
+        # Delaying load_users call slightly or calling it here is needed
+        # We'll just define load_users before this block in a real refactor, 
+        # but for now we will rely on it being defined below. 
+        # Actually, since functions are defined below, we might need to move this check AFTER functions are defined.
+        # Let's Move this check down, after load_users is defined.
+        pass
+
 # File paths
 USERS_JSON_PATH = os.path.join(os.path.dirname(__file__), 'users.json')
 FORUM_CSV_PATH = os.path.join(os.path.dirname(__file__), 'forum_comments.csv')
@@ -437,6 +451,9 @@ def login_page():
                     if st.session_state.role == 'admin':
                         st.session_state.admin_logged_in = True
                         st.session_state.show_admin_panel = True
+                    # Set persistence
+                    st.query_params["session_user"] = user_data['username']
+                    
                     st.success("Connexion réussie ! A vous de jouer !")
                     st.rerun()
                 else:
@@ -670,16 +687,26 @@ if len(st.session_state.game_requests) == 0:
     st.session_state.game_requests = load_game_requests()
 
 # --- User Management Functions ---
-# ... (Functions remain unchanged) ...
+# (Functions are defined above, so we can use them now)
 
-# ... (Previous imports and functions) ...
+# Session Auto-Login Logic
+if not st.session_state.logged_in:
+    qp = st.query_params
+    if "session_user" in qp:
+        saved_user = qp["session_user"]
+        users_db = load_users()
+        # Find user
+        found_user = next((u for u in users_db if u['username'] == saved_user), None)
+        if found_user:
+            st.session_state.logged_in = True
+            st.session_state.username = found_user['username']
+            st.session_state.role = found_user.get('role', 'user')
+            st.session_state.user_icon = found_user.get('icon', '')
+            if st.session_state.role == 'admin':
+                st.session_state.admin_logged_in = True
+                st.session_state.show_admin_panel = True
+            st.toast(f"Bon retour {st.session_state.username} !", icon="👋")
 
-# Admin panel removal - we remove the separate admin login block entirely
-
-
-# Header with Profile
-# Header with Profile - HTML/CSS Implementation for better mobile Control
-# We use a container to align Logo and Profile
 # Header with Profile - Simplified
 col_header, col_user = st.columns([2, 1])
 
@@ -709,6 +736,9 @@ with col_user:
                  st.session_state.username = ""
                  st.session_state.role = "user"
                  st.session_state.admin_logged_in = False
+                 # Clear session param
+                 if "session_user" in st.query_params:
+                     del st.query_params["session_user"]
                  st.rerun()
 
 # Vérification de connexion - afficher login si non connecté
@@ -762,14 +792,16 @@ try:
         
         with col_filters_2:
             # Arrondissement Filter
-            # Ensure we extract full 750XX
-            if 'Code_postal' not in gdf_bar.columns:
-                 # Extract 5 digits starting with 75
-                 gdf_bar['Code_postal'] = gdf_bar['Adresse'].astype(str).str.extract(r'(75\d{3})')
+            # FIX: Use "Code postal" column directly from GeoJSON properties if available
+            if 'Code postal' in gdf_bar.columns:
+                 # Ensure it's string for consistent processing
+                 gdf_bar['Code_postal_clean'] = gdf_bar['Code postal'].astype(str)
+            else:
+                 # Fallback extraction
+                 gdf_bar['Code_postal_clean'] = gdf_bar['Adresse'].astype(str).str.extract(r'(75\d{3})')
             
             # Create arrondissement column for better display
-            if 'Arrondissement' not in gdf_bar.columns:
-                gdf_bar['Arrondissement'] = gdf_bar['Code_postal'].apply(extract_arrondissement)
+            gdf_bar['Arrondissement'] = gdf_bar['Code_postal_clean'].apply(extract_arrondissement)
             
             # Sort unique arrondissements
             unique_arr = sorted(gdf_bar['Arrondissement'].dropna().unique(), key=lambda x: int(x.split('e')[0]))
@@ -813,7 +845,7 @@ try:
         filtered_gdf = gdf_bar.copy()
         
         if selected_zips:
-            filtered_gdf = filtered_gdf[filtered_gdf['Code_postal'].isin(selected_zips)]
+            filtered_gdf = filtered_gdf[filtered_gdf['Code_postal_clean'].isin(selected_zips)]
             
         # --- Bidirectional Sync Logic ---
         # 1. Capture Map Click (Session State 'last_selected_bar')
@@ -856,38 +888,9 @@ try:
                 ).add_to(m)
             
             # Display Map & Capture Returns
-            map_return = st_folium(m, width="100%", height=600, key="main_map")
-            
-            # Handle Click Events - ROBUST FIX
-            if map_return and map_return.get("last_object_clicked"):
-                clicked_pos = map_return["last_object_clicked"]
-                if clicked_pos:
-                    # Find bar with this position with a slightly wider tolerance or exact match logic
-                    # Calculate distance to all bars and pick closest one within a small threshold
-                    # This avoids floating point exact match issues
-                    
-                    clicked_lat = float(clicked_pos['lat'])
-                    clicked_lng = float(clicked_pos['lng'])
-                    
-                    # Find closest bar to click in the whole dataset (not just filtered, just in case)
-                    # Use a simple Euclidean distance on coords for speed appropriate at this scale
-                    # or re-use closest matching logic locally
-                    
-                    candidates = filtered_gdf.copy()
-                    candidates['dist_click'] = ((candidates['lat'] - clicked_lat)**2 + (candidates['lon'] - clicked_lng)**2)**0.5
-                    
-                    # Threshold: approx 50 meters or so. 0.0001 deg is roughly 11 meters lat.
-                    # Let's say 0.0005 to catch the pin click safely.
-                    match = candidates[candidates['dist_click'] < 0.0005].sort_values('dist_click')
-                    
-                    if not match.empty:
-                        selected_name = match.iloc[0]['Nom']
-                        
-                        # Only rerun if it's a NEW selection to avoid loops
-                        if st.session_state.get('last_selected_bar') != selected_name:
-                             st.session_state['search_bar_main'] = selected_name
-                             st.session_state['last_selected_bar'] = selected_name
-                             st.rerun()
+            # Note: We keep capturing return for display but IGNORING clicks as requested
+            st_folium(m, width="100%", height=600, key="main_map")
+
 
         with col_details:
             # We use the session state directly
@@ -950,7 +953,7 @@ try:
                     else:
                         st.info("⚠️ Liste de jeux non disponible.")
             else:
-                st.info("👈 Cliquez sur un pin ou utilisez la barre de recherche pour afficher les détails du bar ici.")
+                st.info("👈 Pour afficher les détails d'un bar, veuillez utiliser la **barre de recherche** (🔍) ou le filtre par arrondissement.")
 
 
     # TAB 2: LES JEUX (Recherche croisée)
