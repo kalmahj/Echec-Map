@@ -796,10 +796,20 @@ try:
         with col_filters_1:
              # Search Bar (Autocomplete)
              all_bar_names = sorted(gdf_bar['Nom'].tolist())
+             
+             # Determine default index based on last_selected_bar
+             default_idx = 0
+             if st.session_state.get('last_selected_bar') in all_bar_names:
+                 default_idx = all_bar_names.index(st.session_state['last_selected_bar']) + 1  # +1 for empty option
+             
              search_query = st.selectbox("🔍 Rechercher un bar spécifique :", 
                                         options=[""] + all_bar_names, 
-                                        index=0,
-                                        key="search_bar_main")
+                                        index=default_idx,
+                                        key="search_bar_widget")
+             
+             # Sync widget selection to session state
+             if search_query:
+                 st.session_state['last_selected_bar'] = search_query
         
         with col_filters_2:
             # Arrondissement Filter
@@ -843,8 +853,7 @@ try:
                             closest_name, dist = find_closest_bar(u_lat, u_lon, gdf_bar)
                             if closest_name:
                                 st.success(f"Le bar le plus proche est : **{closest_name}** ({dist:.2f} km)")
-                                # Update state to select this bar matching the logic below
-                                st.session_state['search_bar_main'] = closest_name
+                                # Update state to select this bar
                                 st.session_state['last_selected_bar'] = closest_name
                                 st.rerun()
                         else:
@@ -1119,8 +1128,11 @@ try:
              if not map_data.empty:
                  st.write("### Résultats")
                  for idx, row in map_data.iterrows():
-                     # Clean bar name of likely artifacts
-                     clean_name = str(row['Nom']).replace("arrow_right", "").replace("->", "").strip()
+                     # Clean bar name of likely artifacts - Aggressive
+                     clean_name = str(row['Nom'])
+                     for artifact in ['arrow_right', 'arrow_down', 'arrow_left', 'arrow_up', '->']:
+                         clean_name = clean_name.replace(artifact, '')
+                     clean_name = clean_name.strip()
                      with st.expander(f"📍 {clean_name}"):
                          st.write(f"🏠 {row['Adresse']}")
                          if pd.notna(row.get('Métro')): st.write(f"🚇 {row['Métro']}")
