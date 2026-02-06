@@ -909,13 +909,13 @@ try:
         with col_map:
             # Scroll Indicator REMOVED (as requested implicitly by "Infos plus bas" removal, replaced by side panel focus)
             
-            m = folium.Map(
-                location=[center_lat, center_lon], 
-                zoom_start=12, 
-                tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+           m = folium.Map(
+                location=map_center, 
+                zoom_start=map_zoom, 
+                tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', 
                 attr='Google',
                 scrollWheelZoom=False
-            )
+            )   
             
             # Add markers
             for idx, row in filtered_gdf.iterrows():
