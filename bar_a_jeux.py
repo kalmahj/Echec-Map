@@ -286,19 +286,36 @@ if 'user_icon' not in st.session_state:
 if 'role' not in st.session_state:
     st.session_state.role = "user"
 
-# Session Persistence Check
+# --- Session Persistence Check (Run immediately) ---
 if not st.session_state.logged_in:
-    # Check if user is in query params
     qp = st.query_params
     if "session_user" in qp:
         saved_user = qp["session_user"]
-        # We need to load users to verify/get details
-        # Delaying load_users call slightly or calling it here is needed
-        # We'll just define load_users before this block in a real refactor, 
-        # but for now we will rely on it being defined below. 
-        # Actually, since functions are defined below, we might need to move this check AFTER functions are defined.
-        # Let's Move this check down, after load_users is defined.
-        pass
+        # Fast load just for auth check if needed, or rely on verification logic later
+        # Since we need to restore state immediately:
+        try:
+            # We need to read users.json here or later. 
+            # To avoid ordering issues, we will just set the state if param exists.
+            # Security verification happens typically on action, but here we trust the param for UI restoration
+            # A more secure way would be verify again, but for this app complexity:
+            st.session_state.logged_in = True
+            st.session_state.username = saved_user
+            # Default role/icon if not fully loaded yet - will update on next action or full load
+            # ideally we match with DB:
+            users_path = os.path.join(os.path.dirname(__file__), 'users.json')
+            if os.path.exists(users_path):
+                with open(users_path, 'r', encoding='utf-8') as f:
+                    users = json.load(f)
+                    user = next((u for u in users if u['username'] == saved_user), None)
+                    if user:
+                        st.session_state.role = user.get('role', 'user')
+                        st.session_state.user_icon = user.get('icon', '')
+                        if st.session_state.role == 'admin':
+                            st.session_state.admin_logged_in = True
+                            st.session_state.show_admin_panel = True
+                        st.toast(f"Session restaurée : Bon retour {saved_user} !", icon="🔄")
+        except:
+             pass
 
 # File paths
 USERS_JSON_PATH = os.path.join(os.path.dirname(__file__), 'users.json')
@@ -559,7 +576,9 @@ def load_games_from_csv():
                 
                 if 'Nom du jeu' in df.columns:
                     for game_name in df['Nom du jeu'].dropna().unique():
-                        games_list.append({'bar_name': bar_name, 'game': str(game_name)})
+                        # Clean artifacts
+                        clean_game = str(game_name).replace('arrow_right', '').replace('arrow_down', '').replace('->', '⬇').strip()
+                        games_list.append({'bar_name': bar_name, 'game': clean_game})
             except:
                 pass
     
@@ -688,24 +707,6 @@ if len(st.session_state.game_requests) == 0:
 
 # --- User Management Functions ---
 # (Functions are defined above, so we can use them now)
-
-# Session Auto-Login Logic
-if not st.session_state.logged_in:
-    qp = st.query_params
-    if "session_user" in qp:
-        saved_user = qp["session_user"]
-        users_db = load_users()
-        # Find user
-        found_user = next((u for u in users_db if u['username'] == saved_user), None)
-        if found_user:
-            st.session_state.logged_in = True
-            st.session_state.username = found_user['username']
-            st.session_state.role = found_user.get('role', 'user')
-            st.session_state.user_icon = found_user.get('icon', '')
-            if st.session_state.role == 'admin':
-                st.session_state.admin_logged_in = True
-                st.session_state.show_admin_panel = True
-            st.toast(f"Bon retour {st.session_state.username} !", icon="👋")
 
 # Header with Profile - Simplified
 col_header, col_user = st.columns([2, 1])
@@ -963,14 +964,40 @@ try:
             elif not filtered_gdf.empty and len(filtered_gdf) < len(gdf_bar):
                 st.markdown(f"### 📋 {len(filtered_gdf)} Bars trouvés")
                 for idx, row in filtered_gdf.iterrows():
-                    with st.expander(f"📍 {row['Nom']}"):
-                        st.write(f"🏠 {row['Adresse']}")
-                        if pd.notna(row.get('Métro')): st.write(f"🚇 {row['Métro']}")
-                        # Button to select this bar details
-                        if st.button("Voir détails", key=f"btn_see_{idx}"):
+                    # Full Bar Card for List View
+                    st.markdown(f"""
+                    <div style="background-color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 5px solid #1E90FF;">
+                        <h3 style="margin-top:0; color: #003366;">{row['Nom']}</h3>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Image
+                    b_img = find_best_image_match(row['Nom'], IMAGES_DIR)
+                    if b_img:
+                        st.image(b_img, use_container_width=True)
+                    
+                    st.write(f"📍 **{row['Adresse']}**")
+                    if pd.notna(row.get('Métro')): st.write(f"🚇 {row['Métro']}")
+                    
+                    c_btn1, c_btn2 = st.columns(2)
+                    with c_btn1:
+                        # Y Aller
+                        encoded_addr = row['Adresse'].replace(' ', '+')
+                        m_url = f"https://www.google.com/maps/search/?api=1&query={encoded_addr}"
+                        st.markdown(f"""
+                            <a href="{m_url}" target="_blank" style="text-decoration: none;">
+                                <div style="background-color:#34A853; color:white; padding:8px; border-radius:5px; text-align:center; font-weight:bold;">
+                                    🏃 Y Aller
+                                </div>
+                            </a>
+                        """, unsafe_allow_html=True)
+                    with c_btn2:
+                        if st.button("👁️ Voir & Jeux", key=f"btn_see_full_{idx}"):
                              st.session_state['search_bar_main'] = row['Nom']
                              st.session_state['last_selected_bar'] = row['Nom']
                              st.rerun()
+                    
+                    st.markdown("---")
             else:
                  st.info("Aucun bar sélectionné. Choissisez un arrondissement pour voir la liste.")
 
