@@ -963,7 +963,18 @@ try:
                             for g in games_list:
                                 st.markdown(f"- {g}")
                     else:
-                        st.info("⚠️ Liste de jeux non disponible.")
+                        # Show 100 random games from other bars
+                        st.info("⚠️ Liste de jeux non disponible pour ce bar. Voici 100 jeux disponibles dans d'autres bars :")
+                        all_available_games = st.session_state.games_data['game'].unique().tolist()
+                        if len(all_available_games) > 100:
+                            import random
+                            random_games = random.sample(all_available_games, 100)
+                        else:
+                            random_games = all_available_games
+                        random_games = sorted(random_games)
+                        with st.container(height=300):
+                            for g in random_games:
+                                st.markdown(f"- {g}")
             
             # NO SPECIFIC BAR SELECTED - Show list if filtered
             elif not filtered_gdf.empty and len(filtered_gdf) < len(gdf_bar):
@@ -1022,59 +1033,76 @@ try:
                             for g in games_list:
                                 st.markdown(f"- {g}")
                     else:
-                        st.info("⚠️ Liste de jeux non disponible.")
+                        # Show 100 random games from other bars
+                        st.info("⚠️ Liste de jeux non disponible pour ce bar. Voici 100 jeux disponibles dans d'autres bars :")
+                        all_available_games = st.session_state.games_data['game'].unique().tolist()
+                        if len(all_available_games) > 100:
+                            import random
+                            random_games = random.sample(all_available_games, 100)
+                        else:
+                            random_games = all_available_games
+                        random_games = sorted(random_games)
+                        with st.container(height=300):
+                            for g in random_games:
+                                st.markdown(f"- {g}")
                     
                     st.markdown("---") # Separator between bars
             else:
                  st.info("Aucun bar sélectionné. Choissisez un arrondissement pour voir la liste.")
 
 
-    # TAB 2: LES JEUX (Recherche croisée)
+    # TAB 2: LES JEUX (Recherche croisée - Redesigned)
     with tab2:
         st.subheader("🎲 Trouver un bar par jeu")
         
-        # Multiselect for Games
-        # Logic for filtering map
-        col_t2_filter1, col_t2_filter2 = st.columns([3, 1])
-        with col_t2_filter1:
-            if not st.session_state.games_data.empty:
-                all_games = sorted(st.session_state.games_data['game'].unique())
-                selected_games_multi = st.multiselect("Sélectionnez un ou plusieurs jeux :", all_games)
-            else:
-                 st.write("Chargement des jeux...")
-                 selected_games_multi = []
+        # Help Text
+        st.markdown('<div class="scroll-indicator">⬇️ Résultats plus bas ⬇️</div>', unsafe_allow_html=True)
         
-        with col_t2_filter2:
-            # Reuses the Code_postal logic from Tab 1 if column exists
-            if 'Code_postal' in gdf_bar.columns:
-                unique_zips = sorted(gdf_bar['Code_postal'].dropna().unique())
-                selected_zips_t2 = st.multiselect("Arrondissement", unique_zips, placeholder="Tous", key="filter_zip_t2")
+        # --- Game Search ---
+        if not st.session_state.games_data.empty:
+            all_games = sorted(st.session_state.games_data['game'].unique())
+            selected_games_multi = st.multiselect("🔍 Rechercher un ou plusieurs jeux :", all_games, placeholder="Sélectionnez des jeux")
+        else:
+            st.write("Chargement des jeux...")
+            selected_games_multi = []
+        
+        # --- Arrondissement Filter ---
+        if 'Arrondissement' in gdf_bar.columns:
+            unique_arr_t2 = sorted(gdf_bar['Arrondissement'].dropna().unique(), key=lambda x: int(x.split('e')[0]))
+            selected_arr_t2 = st.multiselect("📍 Arrondissement", unique_arr_t2, placeholder="Tous les arrondissements", key="arr_filter_t2")
+            
+            # Convert to postal codes
+            if selected_arr_t2:
+                selected_zips_t2 = []
+                for arr in selected_arr_t2:
+                    arr_num = int(arr.split('e')[0])
+                    selected_zips_t2.append(f"750{arr_num:02d}")
             else:
                 selected_zips_t2 = []
+        else:
+            selected_zips_t2 = []
 
+        # --- Filter Data ---
         if selected_games_multi:
             bars_with_games = st.session_state.games_data[st.session_state.games_data['game'].isin(selected_games_multi)]['bar_name'].unique()
             map_data = gdf_bar[gdf_bar['Nom'].isin(bars_with_games)]
         else:
             map_data = gdf_bar
             
-        # Apply Zip Filter
-        if selected_zips_t2:
-            map_data = map_data[map_data['Code_postal'].isin(selected_zips_t2)]
+        # Apply Arrondissement Filter
+        if selected_zips_t2 and 'Code_postal_clean' in map_data.columns:
+            map_data = map_data[map_data['Code_postal_clean'].isin(selected_zips_t2)]
             
         if selected_games_multi:
-            st.info(f"{len(map_data)} bar(s) correspondent à vos critères.")
-        elif not selected_zips_t2:
-             st.markdown("*Sélectionnez des jeux pour filtrer la carte.*")
+            st.info(f"🎯 {len(map_data)} bar(s) proposent les jeux sélectionnés.")
 
-        col_map, col_results = st.columns([2, 1])
+        # --- Layout: Map (Left) | Details (Right) ---
+        col_map, col_details = st.columns([2, 1])
 
         with col_map:
             # Center map
             center_lat = map_data['lat'].mean() if len(map_data) > 0 else 48.8566
             center_lon = map_data['lon'].mean() if len(map_data) > 0 else 2.3522
-            
-
 
             m = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB dark_matter", scrollWheelZoom=False)
             
@@ -1108,34 +1136,82 @@ try:
                 ).add_to(m)
             
             st_folium(m, width="100%", height=500, key="folium_map_games")
-            
-            # Scroll Indicator BELOW Map
-            st.markdown('<div class="scroll-indicator">⬇️ Résultats plus bas ⬇️</div>', unsafe_allow_html=True)
 
-        with col_results:
-             if not map_data.empty:
-                 st.write("### Résultats")
-                 for idx, row in map_data.iterrows():
-                     # Clean bar name of likely artifacts - Aggressive
-                     clean_name = str(row['Nom'])
-                     for artifact in ['arrow_right', 'arrow_down', 'arrow_left', 'arrow_up', '->']:
-                         clean_name = clean_name.replace(artifact, '')
-                     clean_name = clean_name.strip()
-                     with st.expander(f"📍 {clean_name}"):
-                         st.write(f"🏠 {row['Adresse']}")
-                         if pd.notna(row.get('Métro')): st.write(f"🚇 {row['Métro']}")
-                         
-                         # List games found here
-                         if selected_games_multi:
-                             found_games = st.session_state.games_data[
-                                (st.session_state.games_data['bar_name'] == row['Nom']) & 
-                                (st.session_state.games_data['game'].isin(selected_games_multi))
-                             ]['game'].tolist()
-                             st.write("**Jeux trouvés:**")
-                             for g in found_games:
-                                 st.write(f"- {g}")
-             else:
-                 st.warning("Aucun bar ne propose ces jeux simultanément.")
+        with col_details:
+            if selected_games_multi and not map_data.empty:
+                st.markdown(f"### 📋 {len(map_data)} Bar(s) trouvé(s)")
+                
+                # Iterate and show FULL details for each bar
+                for idx, row in map_data.iterrows():
+                    bar_name = row['Nom']
+                    
+                    # --- FULL BAR DETAIL CARD ---
+                    st.markdown(f"""
+                    <div style="background-color: white; padding: 20px; border-radius: 10px; margin-bottom: 30px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); border-top: 5px solid #1E90FF;">
+                        <h2 style="margin-top:0; color: #003366;">{bar_name}</h2>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # 1. Image
+                    img_path = find_best_image_match(bar_name, IMAGES_DIR)
+                    if img_path:
+                        st.image(img_path, use_container_width=True)
+                    else:
+                        st.markdown("""
+                        <div style="background-color:#E6F3FF; height:150px; display:flex; align-items:center; justify-content:center; border-radius:10px; border: 2px dashed #1E90FF; margin-bottom: 15px;">
+                            <span style="color:#1E90FF; font-size:40px;">📷</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    # 2. Info
+                    st.markdown(f"**📍 Adresse:** {row['Adresse']}")
+                    if pd.notna(row.get('Métro')): st.markdown(f"**🚇 Métro:** {row['Métro']}")
+                    
+                    c_d1, c_d2 = st.columns(2)
+                    with c_d1:
+                        if pd.notna(row.get('Téléphone')): st.markdown(f"📞 {row['Téléphone']}")
+                    with c_d2:
+                        if pd.notna(row.get('Site')): st.markdown(f"🌐 [Site Web]({row['Site']})")
+
+                    # 3. Y Aller Button
+                    encoded_address = row['Adresse'].replace(' ', '+')
+                    maps_url = f"https://www.google.com/maps/search/?api=1&query={encoded_address}"
+                    st.markdown(f"""
+                        <a href="{maps_url}" target="_blank" style="text-decoration: none;">
+                            <button style="width:100%; background-color:#34A853; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; margin: 15px 0; font-size: 16px; transition: 0.3s;">
+                                🏃 J'y vais ! (Itinéraire Google Maps)
+                            </button>
+                        </a>
+                    """, unsafe_allow_html=True)
+                    
+                    # 4. Games found (filtered games first)
+                    st.markdown("### 🎲 Jeux recherchés disponibles ici")
+                    found_games = st.session_state.games_data[
+                        (st.session_state.games_data['bar_name'] == bar_name) & 
+                        (st.session_state.games_data['game'].isin(selected_games_multi))
+                    ]['game'].tolist()
+                    
+                    for g in sorted(found_games):
+                        st.markdown(f"✅ **{g}**")
+                    
+                    # 5. All other games at this bar
+                    st.markdown("### 📜 Autres jeux disponibles")
+                    all_bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == bar_name]['game'].tolist()
+                    other_games = [g for g in all_bar_games if g not in found_games]
+                    
+                    if other_games:
+                        with st.container(height=200):
+                            for g in sorted(other_games):
+                                st.markdown(f"- {g}")
+                    else:
+                        st.info("Pas d'autres jeux disponibles.")
+                    
+                    st.markdown("---") # Separator between bars
+            
+            elif not selected_games_multi:
+                st.info("👈 Sélectionnez des jeux pour voir les bars qui les proposent.")
+            else:
+                st.warning("Aucun bar ne propose ces jeux.")
 
         st.markdown("---")
         st.markdown("### ➕ Demander un Jeu (ou modification)")
