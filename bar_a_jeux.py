@@ -1305,6 +1305,7 @@ try:
             st.info("Aucun post")
         else:
             for idx, post in enumerate(st.session_state.forum_posts):
+                is_admin = st.session_state.get('role') == 'admin'
                 col1, col2 = st.columns([4, 1])
                 with col1:
                     reported_flag = "🚩 " if post.get('reported', False) else ""
@@ -1403,15 +1404,18 @@ try:
                             
                         if st.form_submit_button("💬 Commenter"):
                             if c_text:
-                                add_comment_to_post(idx, st.session_state.username, c_text)
-                                st.rerun()
+                                if contains_profanity(c_text):
+                                    st.error("⚠️ Message inapproprié.")
+                                else:
+                                    add_comment_to_post(idx, st.session_state.username, c_text)
+                                    st.rerun()
                             else:
                                 st.error("Message requis")
                 
                 with col2:
                     # Post deletion - Only author or admin
                     is_author = (post['username'] == st.session_state.username)
-                    is_admin = st.session_state.get('role') == 'admin'
+                    # is_admin is already defined at loop start
                     
                     if is_author or is_admin:
                         if st.button("🗑️", key=f"del_post_{idx}", help="Supprimer mon post"):
