@@ -906,13 +906,9 @@ try:
     else:
         tab1, tab2, tab3 = st.tabs(["🍷 Les Bars", "🎲 Les Jeux", "💬 Forum"])
     
-    # TAB 1: LES BARS (Fiche par bar)
-    # TAB 1: LES BARS (Carte Interactive + Détails)
+    # TAB 1: LES BARS (Fiche par bar)   
     with tab1:
-        st.subheader("🍷 Explorer la Carte des Bars")
-        
-    with tab1:
-        st.subheader("🍷 Explorer la Carte des Bars")
+        st.subheader("🍷 Carte des Bars")
         
         col_help, col_reset = st.columns([3, 1])
         with col_help:
