@@ -370,7 +370,7 @@ def auto_commit_csv():
             else:
                 st.error(f"Git Commit Error: {result_commit.stderr}")
         else:
-            st.toast("✅ Ajouté avec succès !", icon="💾")
+            st.toast("✅", icon="💾")
             push_changes()
             
     except FileNotFoundError:
@@ -379,15 +379,16 @@ def auto_commit_csv():
         st.error(f"Auto-commit failed: {str(e)}")
 
 def push_changes():
-    """Push changes to remote repository"""
+    """Push changes to remote repository with rebase"""
     repo_dir = os.path.dirname(os.path.abspath(__file__))
     try:
+        # Pull with rebase first to avoid conflicts
+        subprocess.run(['git', 'pull', '--rebase'], cwd=repo_dir, capture_output=True)
         # Push to origin main (or master)
-        # We try both just in case, or check current branch
         subprocess.run(['git', 'push'], cwd=repo_dir, capture_output=True)
-        st.toast("☁️ Données synchronisées avec le serveur !", icon="cloud")
+        # st.toast("☁️ Données synchronisées avec le serveur !", icon="cloud") 
     except Exception as e:
-        # Fail silently for push if no remote or auth issue, to avoids breaking the app flow
+        # Log to console but don't disrupt user
         print(f"Push failed: {e}")
 
 # --- User Management Functions ---
@@ -495,7 +496,7 @@ def login_page():
     st.markdown("<h1 style='text-align: center; color: #003366;'>Connexion</h1>", unsafe_allow_html=True)
     
     # Guest Access Button
-    if st.button("👥 Continuer sans compte", use_container_width=True):
+    if st.button("Continuer sans compte", use_container_width=True):
         st.session_state.logged_in = True
         st.session_state.username = "Invité"
         st.session_state.role = "guest"
@@ -537,30 +538,48 @@ def login_page():
         if 'temp_selected_icon' not in st.session_state:
             st.session_state.temp_selected_icon = None
             
-        # Grid display
-        cols_count = 3
-        # Pagination or scrolling? Let's just fit all.
+        # Carousel / Pagination Logic
+        items_per_page = 5
+        if 'avatar_page' not in st.session_state:
+            st.session_state.avatar_page = 0
+            
+        total_pages = (len(icons) - 1) // items_per_page + 1
         
-        # We need a container for the grid to keep it separate from the input fields
+        # Slicing
+        start_idx = st.session_state.avatar_page * items_per_page
+        end_idx = start_idx + items_per_page
+        current_icons = icons[start_idx:end_idx]
         
-        # We use standard buttons for selection to update state
-        # Create columns
+        # Display Row
+        cols = st.columns(items_per_page)
+        for i, icon_p in enumerate(current_icons):
+            with cols[i]:
+                # Smaller image display
+                st.image(icon_p, width=60) 
+                
+                # Selection logic
+                if st.session_state.temp_selected_icon == icon_p:
+                     st.markdown(f"<div style='text-align:center; color:green; font-weight:bold; font-size:12px;'>✅</div>", unsafe_allow_html=True)
+                else:
+                     if st.button("Choisir", key=f"sel_{start_idx+i}"):
+                         st.session_state.temp_selected_icon = icon_p
+                         st.rerun()
 
-        for i in range(0, len(icons), cols_count):
-            cols = st.columns(cols_count)
-            for j in range(cols_count):
-                if i + j < len(icons):
-                    icon_p = icons[i+j]
-                    with cols[j]:
-                        st.image(icon_p, use_container_width=True)
-                        # Highlighting logic:
-                        if st.session_state.temp_selected_icon == icon_p:
-                            st.markdown(f"<div style='text-align:center; color:green; font-weight:bold;'>SÉLECTIONNÉ</div>", unsafe_allow_html=True)
-                        else:
-                            if st.button("Choisir", key=f"sel_{i}_{j}"):
-                                st.session_state.temp_selected_icon = icon_p
-                                st.rerun()
-                                
+        # Navigation Buttons
+        c_prev, c_page, c_next = st.columns([1, 2, 1])
+        with c_prev:
+            if st.session_state.avatar_page > 0:
+                if st.button("⬅️ Précédent"):
+                    st.session_state.avatar_page -= 1
+                    st.rerun()
+        with c_next:
+             if st.session_state.avatar_page < total_pages - 1:
+                if st.button("Suivant ➡️"):
+                    st.session_state.avatar_page += 1
+                    st.rerun()
+        with c_page:
+            st.markdown(f"<div style='text-align:center; margin-top:5px;'>Page {st.session_state.avatar_page + 1}/{total_pages}</div>", unsafe_allow_html=True)
+
         st.markdown("---")
         st.markdown("### 2. Vos identifiants")
         
@@ -581,7 +600,17 @@ def login_page():
                 else:
                     success, msg = create_user(new_user, new_pass, st.session_state.temp_selected_icon)
                     if success:
-                        st.success("Compte créé ! Connectez-vous.")
+                        # Auto-Login Logic
+                        st.session_state.logged_in = True
+                        st.session_state.username = new_user
+                        st.session_state.role = "user"
+                        st.session_state.user_icon = st.session_state.temp_selected_icon
+                        st.session_state.admin_logged_in = False
+                        
+                        st.query_params["session_user"] = new_user
+                        
+                        st.success("Compte créé ! Connexion automatique...")
+                        st.rerun()
                     else:
                         st.error(f"❌ {msg}")
 
