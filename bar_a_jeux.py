@@ -370,7 +370,7 @@ def auto_commit_csv():
             else:
                 st.error(f"Git Commit Error: {result_commit.stderr}")
         else:
-            st.toast("✅ Données sauvegardées localement !", icon="💾")
+            st.toast("✅ Ajouté avec succès !", icon="💾")
             push_changes()
             
     except FileNotFoundError:
@@ -495,7 +495,7 @@ def login_page():
     st.markdown("<h1 style='text-align: center; color: #003366;'>Connexion</h1>", unsafe_allow_html=True)
     
     # Guest Access Button
-    if st.button("👥 Continuer sans compte (Mode Invité)", use_container_width=True):
+    if st.button("👥 Continuer sans compte", use_container_width=True):
         st.session_state.logged_in = True
         st.session_state.username = "Invité"
         st.session_state.role = "guest"
