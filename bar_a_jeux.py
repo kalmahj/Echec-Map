@@ -918,7 +918,7 @@ try:
         search_query = st.selectbox("🔍 Rechercher un bar spécifique :", 
                                    options=[""] + all_bar_names, 
                                    index=default_idx,
-                                   key="search_bar_widget")
+                                   key="search_bar_main") # Changed key to match logic below
         
         # Sync widget selection to session state
         if search_query:
@@ -983,12 +983,25 @@ try:
         # 2. Capture Widget Input (switched to Session State key 'search_bar_main')
         
         # When widget changes, it updates 'search_bar_main'. We should sync 'last_selected_bar'.
-        if st.session_state.get('search_bar_main'):
+        if 'search_bar_main' in st.session_state:
              # If widget has a value, sync it to last selection
-             if st.session_state.get('last_selected_bar') != st.session_state['search_bar_main']:
-                 st.session_state['last_selected_bar'] = st.session_state['search_bar_main']
+             if st.session_state['search_bar_main']:
+                 if st.session_state.get('last_selected_bar') != st.session_state['search_bar_main']:
+                     st.session_state['last_selected_bar'] = st.session_state['search_bar_main']
+             # If widget is empty (cleared), reset last_selected_bar to None/Empty to show full map
+             elif st.session_state['search_bar_main'] == "":
+                 st.session_state['last_selected_bar'] = ""
+        
+        # Also check if Arrondissement filter is active but search is empty - we might want to keep selection?
+        # User request: "When we deselect/erase a filter, it resets the map alone where there are all pins. And there is no selected bar"
+        # So if search is empty, we likely want no specific bar selected.
         
         current_selection = st.session_state.get('last_selected_bar', "")
+        
+        # If we have a filter (arrondissement) but no specific bar selection, we just show the filtered pins.
+        # If we have NO filter and NO bar selection, we show ALL pins.
+        
+        # Logic to clear selection if we clear the search box manually is handled above by the elif.
         
         # Map Center Logic
         if current_selection and current_selection in filtered_gdf['Nom'].values:
