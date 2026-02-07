@@ -393,6 +393,13 @@ def push_changes():
 
 # --- User Management Functions ---
 def load_users():
+    # Force pull to ensure latest data
+    repo_dir = os.path.dirname(os.path.abspath(__file__))
+    try:
+        subprocess.run(['git', 'pull', '--rebase'], cwd=repo_dir, capture_output=True)
+    except:
+        pass
+
     if os.path.exists(USERS_JSON_PATH):
         try:
             with open(USERS_JSON_PATH, 'r', encoding='utf-8') as f:
@@ -904,8 +911,18 @@ try:
     with tab1:
         st.subheader("🍷 Explorer la Carte des Bars")
         
-        # Help Text - moved to top as requested
-        st.markdown('<div class="scroll-indicator">⬇️ Résultats plus bas ⬇️</div>', unsafe_allow_html=True)
+    with tab1:
+        st.subheader("🍷 Explorer la Carte des Bars")
+        
+        col_help, col_reset = st.columns([3, 1])
+        with col_help:
+            st.markdown('<div class="scroll-indicator">⬇️ Résultats plus bas ⬇️</div>', unsafe_allow_html=True)
+        with col_reset:
+            if st.button("🔄 Réinitialiser la carte", use_container_width=True):
+                st.session_state['last_selected_bar'] = ""
+                # Clear other filters if possible (requires key management or rerun)
+                st.session_state['search_bar_main'] = "" 
+                st.rerun()
         
         # --- Search Bar ---
         all_bar_names = sorted(gdf_bar['Nom'].tolist())
@@ -966,6 +983,7 @@ try:
                                 st.success(f"Le bar le plus proche est : **{closest_name}** ({dist:.2f} km)")
                                 # Update state to select this bar
                                 st.session_state['last_selected_bar'] = closest_name
+                                st.session_state['just_found_closest'] = True # Flag to prevent auto-reset
                                 st.rerun()
                         else:
                             st.error("Adresse introuvable.")
@@ -988,9 +1006,23 @@ try:
              if st.session_state['search_bar_main']:
                  if st.session_state.get('last_selected_bar') != st.session_state['search_bar_main']:
                      st.session_state['last_selected_bar'] = st.session_state['search_bar_main']
+                     st.session_state['just_found_closest'] = False # Reset flag on manual change
+             
              # If widget is empty (cleared), reset last_selected_bar to None/Empty to show full map
-             elif st.session_state['search_bar_main'] == "":
+             # BUT ONLY IF we didn't just find a closest bar
+             elif st.session_state['search_bar_main'] == "" and not st.session_state.get('just_found_closest', False):
                  st.session_state['last_selected_bar'] = ""
+        
+        # Reset the flag after one run if it was used? 
+        # Actually we need it to persist through the rerun triggered by "Trouver". 
+        # But if the user interacts with something else, it should probably clear.
+        # For now, let's clear it if we detect a mismatch or generic interaction, 
+        # but the safest is to let the user manual reset or select another bar.
+        # To avoid it being stuck true, we can set it to False if we are currently displaying a bar that ISNT the closest one?
+        # Simpler: If the user changes the selectbox, we set it to False above.
+        
+        # Fix: If just found, we want search bar to be empty but selection to be valid. 
+        # The logic above 'elif ... == ""' would kill it. So we added the check check.
         
         # Also check if Arrondissement filter is active but search is empty - we might want to keep selection?
         # User request: "When we deselect/erase a filter, it resets the map alone where there are all pins. And there is no selected bar"
