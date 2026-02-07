@@ -539,7 +539,7 @@ def login_page():
             st.session_state.temp_selected_icon = None
             
         # Carousel / Pagination Logic
-        items_per_page = 5
+        items_per_page = 1
         if 'avatar_page' not in st.session_state:
             st.session_state.avatar_page = 0
             
@@ -550,20 +550,25 @@ def login_page():
         end_idx = start_idx + items_per_page
         current_icons = icons[start_idx:end_idx]
         
-        # Display Row
-        cols = st.columns(items_per_page)
+        # Display Row (Centered Loop for 1 item)
+        # using columns to center: [1, 2, 1]
+        c_left, c_center, c_right = st.columns([1, 2, 1])
+        
         for i, icon_p in enumerate(current_icons):
-            with cols[i]:
-                # Smaller image display
-                st.image(icon_p, width=60) 
+             with c_center:
+                # Centered, slightly larger since it's single
+                st.image(icon_p, width=120) 
                 
                 # Selection logic
                 if st.session_state.temp_selected_icon == icon_p:
-                     st.markdown(f"<div style='text-align:center; color:green; font-weight:bold; font-size:12px;'>✅</div>", unsafe_allow_html=True)
+                     st.markdown(f"<div style='text-align:center; color:green; font-weight:bold; margin-bottom:10px;'>✅ SÉLECTIONNÉ</div>", unsafe_allow_html=True)
                 else:
-                     if st.button("Choisir", key=f"sel_{start_idx+i}"):
-                         st.session_state.temp_selected_icon = icon_p
-                         st.rerun()
+                     # Center button using hack or columns
+                     b_c1, b_c2, b_c3 = st.columns([1,2,1])
+                     with b_c2:
+                         if st.button("Choisir", key=f"sel_{start_idx+i}"):
+                             st.session_state.temp_selected_icon = icon_p
+                             st.rerun()
 
         # Navigation Buttons
         c_prev, c_page, c_next = st.columns([1, 2, 1])
@@ -600,16 +605,12 @@ def login_page():
                 else:
                     success, msg = create_user(new_user, new_pass, st.session_state.temp_selected_icon)
                     if success:
-                        # Auto-Login Logic
-                        st.session_state.logged_in = True
-                        st.session_state.username = new_user
-                        st.session_state.role = "user"
-                        st.session_state.user_icon = st.session_state.temp_selected_icon
-                        st.session_state.admin_logged_in = False
-                        
-                        st.query_params["session_user"] = new_user
-                        
-                        st.success("Compte créé ! Connexion automatique...")
+                        # Redirect to Login (No Auto-Login)
+                        # We just show success and rerun. Streamlit tabs usually default to first tab (Login) on rerun 
+                        # if state isn't preserved specifically for tabs.
+                        st.success("Compte créé avec succès ! Connectez-vous.")
+                        import time
+                        time.sleep(1)
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
