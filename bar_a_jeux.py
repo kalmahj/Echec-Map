@@ -370,12 +370,25 @@ def auto_commit_csv():
             else:
                 st.error(f"Git Commit Error: {result_commit.stderr}")
         else:
-            st.toast("✅ Demande envoyée !", icon="💾")
+            st.toast("✅ Données sauvegardées localement !", icon="💾")
+            push_changes()
             
     except FileNotFoundError:
         st.error("⚠️ Git n'est pas installé ou n'est pas dans le PATH.")
     except Exception as e:
         st.error(f"Auto-commit failed: {str(e)}")
+
+def push_changes():
+    """Push changes to remote repository"""
+    repo_dir = os.path.dirname(os.path.abspath(__file__))
+    try:
+        # Push to origin main (or master)
+        # We try both just in case, or check current branch
+        subprocess.run(['git', 'push'], cwd=repo_dir, capture_output=True)
+        st.toast("☁️ Données synchronisées avec le serveur !", icon="cloud")
+    except Exception as e:
+        # Fail silently for push if no remote or auth issue, to avoids breaking the app flow
+        print(f"Push failed: {e}")
 
 # --- User Management Functions ---
 def load_users():
@@ -400,6 +413,7 @@ def save_users(users_list):
         
         subprocess.run(['git', 'add', 'users.json'], cwd=repo_dir, capture_output=True)
         subprocess.run(['git', 'commit', '-m', 'Update users'], cwd=repo_dir, capture_output=True)
+        push_changes()
     except:
         pass
 
@@ -479,6 +493,16 @@ def contains_profanity(text):
 # --- Login / Register Page ---
 def login_page():
     st.markdown("<h1 style='text-align: center; color: #003366;'>Connexion</h1>", unsafe_allow_html=True)
+    
+    # Guest Access Button
+    if st.button("👥 Continuer sans compte (Mode Invité)", use_container_width=True):
+        st.session_state.logged_in = True
+        st.session_state.username = "Invité"
+        st.session_state.role = "guest"
+        st.session_state.user_icon = "" 
+        st.rerun()
+
+    st.markdown("---")
     
     tab1, tab2 = st.tabs(["Se connecter", "Créer un compte"])
     
@@ -959,9 +983,18 @@ try:
                 is_selected = (current_selection == row['Nom'])
                 icon_color = "red" if is_selected else "blue"
                 
+                popup_html = f"""
+                <div style="font-family: 'Montserrat', sans-serif; min-width: 200px;">
+                    <h5 style="color: #1E90FF; margin-bottom: 5px; font-weight:bold;">{row['Nom']}</h5>
+                    <p style="margin: 2px 0; font-size:12px;"><b>📍 ADRESSE:</b><br>{row['Adresse']}</p>
+                    <p style="margin: 2px 0; font-size:12px;"><b>🚇 MÉTRO:</b><br>{row.get('Métro', 'Non indiqué')}</p>
+                </div>
+                """
+
                 folium.Marker(
                     [row['lat'], row['lon']],
                     tooltip=row['Nom'],
+                    popup=folium.Popup(popup_html, max_width=300),
                     icon=folium.Icon(color=icon_color, icon="glass-cheers", prefix="fa")
                 ).add_to(m)
             
@@ -1232,71 +1265,78 @@ try:
 
         st.markdown("---")
         st.markdown("### ➕ Demander un Jeu (ou modification)")
-        with st.form("request_game_new"):
-            col_req1, col_req2 = st.columns(2)
-            with col_req1:
-                req_user = st.text_input("Votre Nom/Pseudo :", value=st.session_state.username)
-                req_bar = st.selectbox("Bar concerné :", gdf_bar['Nom'].sort_values().tolist())
-            with col_req2:
-                req_game = st.text_input("Nom du Jeu :")
-                req_action = st.selectbox("Type de demande :", ["Ajouter le jeu", "Signaler une erreur"])
-            
-            req_desc = st.text_area("Description / Détails :", placeholder="Ex: Le jeu n'est plus disponible...")
-            
-            if st.form_submit_button("📤 Envoyer la demande"):
-                if req_user and req_game and req_bar:
-                    request = {
-                        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        'username': req_user,
-                        'bar_name': req_bar,
-                        'game_name': req_game,
-                        'action_type': req_action,
-                        'description': req_desc,
-                        'status': 'pending'
-                    }
-                    st.session_state.game_requests.append(request)
-                    save_game_request(request)
-                    st.success("✅ Demande envoyée aux administrateurs !")
-                else:
-                    st.error("⚠️ Veuillez remplir le nom, le bar et le jeu.")
+        
+        if st.session_state.role == 'guest':
+             st.info("🔒 Vous devez être connecté pour faire une demande.")
+        else:
+            with st.form("request_game_new"):
+                col_req1, col_req2 = st.columns(2)
+                with col_req1:
+                    req_user = st.text_input("Votre Nom/Pseudo :", value=st.session_state.username)
+                    req_bar = st.selectbox("Bar concerné :", gdf_bar['Nom'].sort_values().tolist())
+                with col_req2:
+                    req_game = st.text_input("Nom du Jeu :")
+                    req_action = st.selectbox("Type de demande :", ["Ajouter le jeu", "Signaler une erreur"])
+                
+                req_desc = st.text_area("Description / Détails :", placeholder="Ex: Le jeu n'est plus disponible...")
+                
+                if st.form_submit_button("📤 Envoyer la demande"):
+                    if req_user and req_game and req_bar:
+                        request = {
+                            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            'username': req_user,
+                            'bar_name': req_bar,
+                            'game_name': req_game,
+                            'action_type': req_action,
+                            'description': req_desc,
+                            'status': 'pending'
+                        }
+                        st.session_state.game_requests.append(request)
+                        save_game_request(request)
+                        st.success("✅ Demande envoyée aux administrateurs !")
+                    else:
+                        st.error("⚠️ Veuillez remplir le nom, le bar et le jeu.")
     
     # TAB 3: Forum
     with tab3:
         st.subheader("💬 Forum")
         
-        with st.form("new_post"):
-            # Username is now automatic
-            st.write(f"**Auteur :** {st.session_state.username}")
-            bar_choice = st.selectbox("Bar :", ["N'importe quel Bar"] + gdf_bar['Nom'].sort_values().tolist())
-            game_choice = st.text_input("Jeu :", placeholder="Tapez le nom du jeu")
-            date_time = st.text_input("Quand :", placeholder="ex: Demain 19h")
-            message = st.text_area("Message :")
-            
-            if st.form_submit_button("Publier"):
-                if message and game_choice:
-                    # Check profanity
-                    if contains_profanity(message) or contains_profanity(game_choice):
-                        st.error("⚠️ Votre message contient des termes inappropriés et n'a pas été publié.")
+        if st.session_state.role == 'guest':
+            st.info("🔒 Connectez-vous pour publier un message.")
+        else:
+            with st.form("new_post"):
+                # Username is now automatic
+                st.write(f"**Auteur :** {st.session_state.username}")
+                bar_choice = st.selectbox("Bar :", ["N'importe quel Bar"] + gdf_bar['Nom'].sort_values().tolist())
+                game_choice = st.text_input("Jeu :", placeholder="Tapez le nom du jeu")
+                date_time = st.text_input("Quand :", placeholder="ex: Demain 19h")
+                message = st.text_area("Message :")
+                
+                if st.form_submit_button("Publier"):
+                    if message and game_choice:
+                        # Check profanity
+                        if contains_profanity(message) or contains_profanity(game_choice):
+                            st.error("⚠️ Votre message contient des termes inappropriés et n'a pas été publié.")
+                        else:
+                            post = {
+                                'username': st.session_state.username,
+                                'user_icon': st.session_state.user_icon, # Store icon path with post
+                                'bar': bar_choice,
+                                'game': game_choice,
+                                'when': date_time,
+                                'message': message,
+                                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                'reported': False,
+                                'report_reason': '',
+                                'reactions': '',
+                                'comments': [] # Initialize as empty list
+                            }
+                            st.session_state.forum_posts.insert(0, post)
+                            save_forum_comment(post)
+                            st.success("✅ Publié")
+                            st.rerun()
                     else:
-                        post = {
-                            'username': st.session_state.username,
-                            'user_icon': st.session_state.user_icon, # Store icon path with post
-                            'bar': bar_choice,
-                            'game': game_choice,
-                            'when': date_time,
-                            'message': message,
-                            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            'reported': False,
-                            'report_reason': '',
-                            'reactions': '',
-                            'comments': [] # Initialize as empty list
-                        }
-                        st.session_state.forum_posts.insert(0, post)
-                        save_forum_comment(post)
-                        st.success("✅ Publié")
-                        st.rerun()
-                else:
-                    st.error("Remplissez tous les champs")
+                        st.error("Remplissez tous les champs")
         
         st.markdown("---")
         st.markdown("**Posts Récents**")
@@ -1395,22 +1435,25 @@ try:
                                     st.rerun()
                     
                     # Add comment
-                    with st.form(f"comment_{idx}"):
-                        col_c1, col_c2 = st.columns([1, 3])
-                        with col_c1:
-                            st.write(f"👤 {st.session_state.username}")
-                        with col_c2:
-                            c_text = st.text_input("Commentaire:", key=f"c_text_{idx}")
-                            
-                        if st.form_submit_button("💬 Commenter"):
-                            if c_text:
-                                if contains_profanity(c_text):
-                                    st.error("⚠️ Message inapproprié.")
+                    if st.session_state.role != 'guest':
+                        with st.form(f"comment_{idx}"):
+                            col_c1, col_c2 = st.columns([1, 3])
+                            with col_c1:
+                                st.write(f"👤 {st.session_state.username}")
+                            with col_c2:
+                                c_text = st.text_input("Commentaire:", key=f"c_text_{idx}")
+                                
+                            if st.form_submit_button("💬 Commenter"):
+                                if c_text:
+                                    if contains_profanity(c_text):
+                                        st.error("⚠️ Message inapproprié.")
+                                    else:
+                                        add_comment_to_post(idx, st.session_state.username, c_text)
+                                        st.rerun()
                                 else:
-                                    add_comment_to_post(idx, st.session_state.username, c_text)
-                                    st.rerun()
-                            else:
-                                st.error("Message requis")
+                                    st.error("Message requis")
+                    else:
+                        st.caption("🔒 Connectez-vous pour commenter.")
                 
                 with col2:
                     # Post deletion - Only author or admin
