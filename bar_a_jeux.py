@@ -473,7 +473,7 @@ def get_available_icons():
     return []
 
 def get_menu_pdf_path(bar_name):
-    """Find the menu PDF for a given bar"""
+    """Find the menu PDF for a given bar with fuzzy logic"""
     menus_dir = os.path.join(os.path.dirname(__file__), 'Menus_bars')
     if not os.path.exists(menus_dir):
         return None
@@ -484,9 +484,27 @@ def get_menu_pdf_path(bar_name):
     pdf_path = os.path.join(menus_dir, f"{normalized_name}.pdf")
     if os.path.exists(pdf_path):
         return pdf_path
-        
-    # Check approximate match if needed, or iterate
-    # The user said logic matches normally, so we rely on normalize_string
+
+    # Fuzzy logic (similar to images)
+    try:
+        files = [f for f in os.listdir(menus_dir) if f.lower().endswith('.pdf')]
+    except:
+        return None
+
+    # 1. Check if normalized filename matches
+    for f in files:
+        if normalize_string(os.path.splitext(f)[0]) == normalized_name:
+            return os.path.join(menus_dir, f)
+
+    # 2. Fuzzy match
+    norm_map = {normalize_string(os.path.splitext(f)[0]): f for f in files}
+    # Matches "aux_des_cales_xvii" with "aux_des_cales_17" ?
+    # Difflib might struggle with 17 vs XVII. Let's add specific logic or hope fuzzy catches it.
+    # Actually, let's just do standard fuzzy first.
+    matches = difflib.get_close_matches(normalized_name, norm_map.keys(), n=1, cutoff=0.5) # Lower cutoff
+    if matches:
+        return os.path.join(menus_dir, norm_map[matches[0]])
+    
     return None
 
 def load_insults():
