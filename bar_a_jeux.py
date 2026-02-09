@@ -333,7 +333,7 @@ BAR_CSV_MAPPING = {
 
 # --- User Management Functions ---
 def load_users():
-    """Load users from local file - DON'T pull on every read"""
+    """Load users from local file - don't pull on every read please lol"""
     if os.path.exists(USERS_JSON_PATH):
         try:
             with open(USERS_JSON_PATH, 'r', encoding='utf-8') as f:
