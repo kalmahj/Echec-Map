@@ -331,88 +331,102 @@ BAR_CSV_MAPPING = {
     'liste_jeux_oya.csv': 'Oya Café',
 }
 
+# Auto-commit CSV function
+def auto_commit_csv():
+    repo_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Configure local git identity to avoid "Author identity unknown" error
+    try:
+        subprocess.run(['git', 'config', 'user.email', 'app@echec-map.com'], cwd=repo_dir, capture_output=True)
+        subprocess.run(['git', 'config', 'user.name', 'Echec Map Bot'], cwd=repo_dir, capture_output=True)
+    except:
+        pass
+
+    # Check if git is initialized
+    if not os.path.exists(os.path.join(repo_dir, ".git")):
+        st.error("⚠️ Git n'est pas initialisé dans ce dossier.")
+        return
+
+    try:
+        # Add files
+        result_add = subprocess.run(['git', 'add', 'forum_comments.csv', 'game_requests.csv'], 
+                                  cwd=repo_dir, 
+                                  capture_output=True, 
+                                  text=True)
+        
+        if result_add.returncode != 0:
+            st.error(f"Git Add Error: {result_add.stderr}")
+            return
+            
+        # Commit changes
+        result_commit = subprocess.run(['git', 'commit', '-m', 'Auto-update CSV files'], 
+                                     cwd=repo_dir, 
+                                     capture_output=True, 
+                                     text=True)
+        
+        if result_commit.returncode != 0:
+            if "nothing to commit" in result_commit.stdout.lower():
+                pass # No changes
+            else:
+                st.error(f"Git Commit Error: {result_commit.stderr}")
+        else:
+            st.toast("✅", icon="💾")
+            push_changes()
+            
+    except FileNotFoundError:
+        st.error("⚠️ Git n'est pas installé ou n'est pas dans le PATH.")
+    except Exception as e:
+        st.error(f"Auto-commit failed: {str(e)}")
+
+def push_changes():
+    """Push changes to remote repository with rebase"""
+    repo_dir = os.path.dirname(os.path.abspath(__file__))
+    try:
+        # Pull with rebase first to avoid conflicts
+        subprocess.run(['git', 'pull', '--rebase'], cwd=repo_dir, capture_output=True)
+        # Push to origin main (or master)
+        subprocess.run(['git', 'push'], cwd=repo_dir, capture_output=True)
+        # st.toast("☁️ Données synchronisées avec le serveur !", icon="cloud") 
+    except Exception as e:
+        # Log to console but don't disrupt user
+        print(f"Push failed: {e}")
+
 # --- User Management Functions ---
 def load_users():
-    """Load users from local file - don't pull on every read please lol"""
+    # Force pull to ensure latest data
+    repo_dir = os.path.dirname(os.path.abspath(__file__))
+    try:
+        subprocess.run(['git', 'pull', '--rebase'], cwd=repo_dir, capture_output=True)
+    except:
+        pass
+
     if os.path.exists(USERS_JSON_PATH):
         try:
             with open(USERS_JSON_PATH, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except Exception as e:
-            st.error(f"Error loading users: {e}")
+        except:
             return []
     return []
 
 def save_users(users_list):
-    """Save users and commit/push changes"""
-    # First save locally
-    try:
-        with open(USERS_JSON_PATH, 'w', encoding='utf-8') as f:
-            json.dump(users_list, f, indent=4, ensure_ascii=False)
-    except Exception as e:
-        st.error(f"Error saving users.json: {e}")
-        return False
+    with open(USERS_JSON_PATH, 'w', encoding='utf-8') as f:
+        json.dump(users_list, f, indent=4, ensure_ascii=False)
     
-    # Then commit and push
+    # Auto-commit users.json
     repo_dir = os.path.dirname(os.path.abspath(__file__))
     try:
         # Configure local git identity
-        subprocess.run(['git', 'config', 'user.email', 'app@echec-map.com'], 
-                      cwd=repo_dir, capture_output=True, check=False)
-        subprocess.run(['git', 'config', 'user.name', 'Echec Map Bot'], 
-                      cwd=repo_dir, capture_output=True, check=False)
+        subprocess.run(['git', 'config', 'user.email', 'app@echec-map.com'], cwd=repo_dir, capture_output=True)
+        subprocess.run(['git', 'config', 'user.name', 'Echec Map Bot'], cwd=repo_dir, capture_output=True)
         
-        # Pull with rebase to get latest changes
-        pull_result = subprocess.run(['git', 'pull', '--rebase'], 
-                                    cwd=repo_dir, capture_output=True, text=True)
-        
-        if pull_result.returncode != 0:
-            # If pull failed due to conflicts, try to resolve
-            if "conflict" in pull_result.stderr.lower():
-                st.warning("⚠️ Conflit détecté lors de la synchronisation. Nouvelle tentative...")
-                # Abort rebase and force our version
-                subprocess.run(['git', 'rebase', '--abort'], cwd=repo_dir, capture_output=True)
-                # Re-save our version
-                with open(USERS_JSON_PATH, 'w', encoding='utf-8') as f:
-                    json.dump(users_list, f, indent=4, ensure_ascii=False)
-        
-        # Add the file
-        add_result = subprocess.run(['git', 'add', 'users.json'], 
-                                   cwd=repo_dir, capture_output=True, text=True)
-        if add_result.returncode != 0:
-            st.error(f"Git add failed: {add_result.stderr}")
-            return False
-        
-        # Commit
-        commit_result = subprocess.run(['git', 'commit', '-m', 'Update users'], 
-                                      cwd=repo_dir, capture_output=True, text=True)
-        
-        if commit_result.returncode != 0:
-            if "nothing to commit" not in commit_result.stdout.lower():
-                st.error(f"Git commit failed: {commit_result.stderr}")
-                return False
-        
-        # Push with retry
-        max_retries = 3
-        for attempt in range(max_retries):
-            push_result = subprocess.run(['git', 'push'], 
-                                        cwd=repo_dir, capture_output=True, text=True)
-            if push_result.returncode == 0:
-                return True
-            else:
-                if attempt < max_retries - 1:
-                    # Pull again and retry
-                    subprocess.run(['git', 'pull', '--rebase'], 
-                                 cwd=repo_dir, capture_output=True)
-                else:
-                    st.error(f"Git push failed after {max_retries} attempts: {push_result.stderr}")
-                    return False
-        
-        return True
-        
-    except Exception as e:
-        st.error(f"Git operation failed: {str(e)}")
-        return False
+        subprocess.run(['git', 'add', 'users.json'], cwd=repo_dir, capture_output=True)
+        subprocess.run(['git', 'commit', '-m', 'Update users'], cwd=repo_dir, capture_output=True)
+        push_changes()
+    except:
+        pass
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
 def create_user(username, password, icon_path):
     users = load_users()
@@ -423,16 +437,190 @@ def create_user(username, password, icon_path):
         'username': username,
         'password': hash_password(password),
         'icon': icon_path,
-        'role': 'user'
+        'role': 'user' # Default role
     }
     users.append(new_user)
+    save_users(users)
+    return True, "Compte créé avec succès !"
+
+def verify_user(username, password):
+    users = load_users()
     
-    # Save and verify it worked
-    success = save_users(users)
-    if success or success is None:  # None means local save worked even if push failed
-        return True, "Compte créé avec succès !"
-    else:
-        return False, "Erreur lors de la sauvegarde du compte."
+    # Check for hardcoded admin first if not in DB (or migration)
+    if username == "admin" and password == "admin123":
+        # Ensure admin exists in DB
+        if not any(u['username'] == 'admin' for u in users):
+            admin_user = {
+                'username': 'admin',
+                'password': hash_password('admin123'),
+                'icon': '',
+                'role': 'admin'
+            }
+            users.append(admin_user)
+            save_users(users)
+        return True, {'username': 'admin', 'role': 'admin', 'icon': ''}
+
+    encoded_pw = hash_password(password)
+    for user in users:
+        if user['username'] == username and user['password'] == encoded_pw:
+            return True, user
+    return False, None
+
+def get_available_icons():
+    if os.path.exists(ICONS_DIR):
+        # List png files
+        return glob.glob(os.path.join(ICONS_DIR, "*.png"))
+    return []
+
+def load_insults():
+    """Load insults from file"""
+    insults_path = os.path.join(os.path.dirname(__file__), 'liste_insultes.txt')
+    if os.path.exists(insults_path):
+        try:
+            with open(insults_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                # Content is like ["word", "word", ...]
+                # We can safely eval it as it is a list of strings, or json load it
+                import ast
+                return ast.literal_eval(content)
+        except:
+            return []
+    return []
+
+def contains_profanity(text):
+    """Check if text contains profanity"""
+    if not text: return False
+    insults = load_insults()
+    text_lower = text.lower()
+    for insult in insults:
+        # Simple inclusion check
+        if insult.lower() in text_lower:
+            return True
+    return False
+
+# --- Login / Register Page ---
+def login_page():
+    st.markdown("<h1 style='text-align: center; color: #003366;'>Connexion</h1>", unsafe_allow_html=True)
+    
+    # Guest Access Button
+    if st.button("Continuer sans compte", use_container_width=True):
+        st.session_state.logged_in = True
+        st.session_state.username = "Invité"
+        st.session_state.role = "guest"
+        st.session_state.user_icon = "" 
+        st.rerun()
+
+    st.markdown("---")
+    
+    tab1, tab2 = st.tabs(["Se connecter", "Créer un compte"])
+    
+    with tab1:
+        with st.form("login_form"):
+            username = st.text_input("Utilisateur")
+            password = st.text_input("Mot de passe", type="password")
+            submit = st.form_submit_button("Se connecter", type="primary")
+            
+            if submit:
+                success, user_data = verify_user(username, password)
+                if success:
+                    st.session_state.logged_in = True
+                    st.session_state.username = user_data['username']
+                    st.session_state.role = user_data.get('role', 'user')
+                    st.session_state.user_icon = user_data.get('icon', '')
+                    if st.session_state.role == 'admin':
+                        st.session_state.admin_logged_in = True
+                        st.session_state.show_admin_panel = True
+                    # Set persistence
+                    st.query_params["session_user"] = user_data['username']
+                    
+                    st.success("Connexion réussie ! A vous de jouer !")
+                    st.rerun()
+                else:
+                    st.error("Nom d'utilisateur ou mot de passe incorrect.")
+
+
+    with tab2:
+        st.markdown("### 1. Choisissez votre avatar")
+        icons = get_available_icons()
+        if 'temp_selected_icon' not in st.session_state:
+            st.session_state.temp_selected_icon = None
+            
+        # Carousel / Pagination Logic
+        items_per_page = 1
+        if 'avatar_page' not in st.session_state:
+            st.session_state.avatar_page = 0
+            
+        total_pages = (len(icons) - 1) // items_per_page + 1
+        
+        # Slicing
+        start_idx = st.session_state.avatar_page * items_per_page
+        end_idx = start_idx + items_per_page
+        current_icons = icons[start_idx:end_idx]
+        
+        # Display Row (Centered Loop for 1 item)
+        # using columns to center: [1, 2, 1]
+        c_left, c_center, c_right = st.columns([1, 2, 1])
+        
+        for i, icon_p in enumerate(current_icons):
+             with c_center:
+                # Centered, slightly larger since it's single
+                st.image(icon_p, width=120) 
+                
+                # Selection logic
+                if st.session_state.temp_selected_icon == icon_p:
+                     st.markdown(f"<div style='text-align:center; color:green; font-weight:bold; margin-bottom:10px;'>✅ SÉLECTIONNÉ</div>", unsafe_allow_html=True)
+                else:
+                     # Center button using hack or columns
+                     b_c1, b_c2, b_c3 = st.columns([1,2,1])
+                     with b_c2:
+                         if st.button("Choisir", key=f"sel_{start_idx+i}"):
+                             st.session_state.temp_selected_icon = icon_p
+                             st.rerun()
+
+        # Navigation Buttons
+        c_prev, c_page, c_next = st.columns([1, 2, 1])
+        with c_prev:
+            if st.session_state.avatar_page > 0:
+                if st.button("⬅️ Précédent"):
+                    st.session_state.avatar_page -= 1
+                    st.rerun()
+        with c_next:
+             if st.session_state.avatar_page < total_pages - 1:
+                if st.button("Suivant ➡️"):
+                    st.session_state.avatar_page += 1
+                    st.rerun()
+        with c_page:
+            st.markdown(f"<div style='text-align:center; margin-top:5px;'>Page {st.session_state.avatar_page + 1}/{total_pages}</div>", unsafe_allow_html=True)
+
+        st.markdown("---")
+        st.markdown("### 2. Vos identifiants")
+        
+        with st.form("register_final"):
+            new_user = st.text_input("Nom d'utilisateur")
+            new_pass = st.text_input("Mot de passe", type="password")
+            confirm_pass = st.text_input("Confirmer", type="password")
+            
+            create_btn = st.form_submit_button("VALIDER L'INSCRIPTION")
+            
+            if create_btn:
+                if not st.session_state.temp_selected_icon:
+                    st.error("⚠️ Veuillez choisir un avatar ci-dessus (cliquez sur 'Choisir').")
+                elif new_pass != confirm_pass:
+                    st.error("⚠️ Les mots de passe ne correspondent pas.")
+                elif not new_user or not new_pass:
+                    st.error("⚠️ Tous les champs sont requis.")
+                else:
+                    success, msg = create_user(new_user, new_pass, st.session_state.temp_selected_icon)
+                    if success:
+                        # Redirect to Login (No Auto-Login)
+                        # We just show success and rerun. Streamlit tabs usually default to first tab (Login) on rerun 
+                        # if state isn't preserved specifically for tabs.
+                        st.success("Compte créé avec succès ! Connectez-vous.")
+                        import time
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error(f"❌ {msg}")
 
 def detect_encoding(file_path):
     with open(file_path, 'rb') as f:
