@@ -382,8 +382,8 @@ def push_changes():
     """Push changes to remote repository with rebase"""
     repo_dir = os.path.dirname(os.path.abspath(__file__))
     try:
-        # Pull with rebase first to avoid conflicts
-        subprocess.run(['git', 'pull', '--rebase'], cwd=repo_dir, capture_output=True)
+        # Pull with rebase first to avoid conflicts - DISABLED BY USER REQUEST
+        # subprocess.run(['git', 'pull', '--rebase'], cwd=repo_dir, capture_output=True)
         # Push to origin main (or master)
         subprocess.run(['git', 'push'], cwd=repo_dir, capture_output=True)
         # st.toast("☁️ Données synchronisées avec le serveur !", icon="cloud") 
@@ -393,12 +393,12 @@ def push_changes():
 
 # --- User Management Functions ---
 def load_users():
-    # Force pull to ensure latest data
-    repo_dir = os.path.dirname(os.path.abspath(__file__))
-    try:
-        subprocess.run(['git', 'pull', '--rebase'], cwd=repo_dir, capture_output=True)
-    except:
-        pass
+    # Force pull to ensure latest data - DISABLED BY USER REQUEST to keep local data persistence
+    # repo_dir = os.path.dirname(os.path.abspath(__file__))
+    # try:
+    #     subprocess.run(['git', 'pull', '--rebase'], cwd=repo_dir, capture_output=True)
+    # except:
+    #     pass
 
     if os.path.exists(USERS_JSON_PATH):
         try:
@@ -471,6 +471,23 @@ def get_available_icons():
         # List png files
         return glob.glob(os.path.join(ICONS_DIR, "*.png"))
     return []
+
+def get_menu_pdf_path(bar_name):
+    """Find the menu PDF for a given bar"""
+    menus_dir = os.path.join(os.path.dirname(__file__), 'Menus_bars')
+    if not os.path.exists(menus_dir):
+        return None
+        
+    normalized_name = normalize_string(bar_name)
+    
+    # Check for direct match first (e.g. le_3bis.pdf)
+    pdf_path = os.path.join(menus_dir, f"{normalized_name}.pdf")
+    if os.path.exists(pdf_path):
+        return pdf_path
+        
+    # Check approximate match if needed, or iterate
+    # The user said logic matches normally, so we rely on normalize_string
+    return None
 
 def load_insults():
     """Load insults from file"""
@@ -1122,6 +1139,20 @@ try:
                             </button>
                         </a>
                     """, unsafe_allow_html=True)
+
+                    # MENU BUTTON
+                    menu_path = get_menu_pdf_path(selected_bar_name)
+                    if menu_path:
+                        with open(menu_path, "rb") as pdf_file:
+                             pdf_bytes = pdf_file.read()
+                             st.download_button(
+                                 label="📜 DÉCOUVRIR LE MENU",
+                                 data=pdf_bytes,
+                                 file_name=f"Menu_{selected_bar_name}.pdf",
+                                 mime="application/pdf",
+                                 use_container_width=True,
+                                 key=f"btn_menu_{idx}_sel" # Ensure unique key
+                             )
                     
                     # 4. Games List (Bullet points)
                     st.markdown("### 🎲 Jeux Disponibles")
@@ -1178,6 +1209,20 @@ try:
                             </button>
                         </a>
                     """, unsafe_allow_html=True)
+                    
+                    # MENU BUTTON
+                    menu_path2 = get_menu_pdf_path(bar_name)
+                    if menu_path2:
+                        with open(menu_path2, "rb") as pdf_file2:
+                             pdf_bytes2 = pdf_file2.read()
+                             st.download_button(
+                                 label="📜 DÉCOUVRIR LE MENU",
+                                 data=pdf_bytes2,
+                                 file_name=f"Menu_{bar_name}.pdf",
+                                 mime="application/pdf",
+                                 use_container_width=True,
+                                 key=f"btn_menu_{idx}_list"
+                             )
                     
                     # 4. Games List (Bullet points)
                     st.markdown("### 🎲 Jeux Disponibles")
