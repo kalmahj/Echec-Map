@@ -472,12 +472,43 @@ def get_available_icons():
         return glob.glob(os.path.join(ICONS_DIR, "*.png"))
     return []
 
+BAR_MENU_MAPPING = {
+    "Le dernier bar avant la fin du monde": "le_dernier_bar_avant_la_fin_du_monde.pdf",
+    "Les grands gamins": "les_grands_gamins.pdf",
+    "The good game": "the_good_game.pdf",
+    "Le nid cocon ludique": "le_nid_cocon_ludique.pdf",
+    "La Cabane": "la_cabane.pdf",
+    "Loufoque": "loufoque.pdf",
+    "Les Caves Alliées": "les_caves_alliees.pdf",
+    "Le Chauve Qui Rit": "le_chauve_qui_rit.pdf",
+    "Café Meisia": "cafe_meisia.pdf",
+    "Les Mauvais Joueurs": "les_mauvais_joueurs.pdf",
+    "Le Duchesse": "la_duchesse.pdf",
+    "Au Bonheur des Jeux": "au_bonheur_des_jeux.pdf",
+    "OberJeux": "oberjeux.pdf",
+    "La revanche": "la_revanche.pdf",
+    "Au Dé 12": "au_de_12.pdf",
+    "Multivers (Ground control)": "multivers_ground_control.pdf",
+    "Le 3bis": "le_3bis.pdf",
+    "La Taverne De Fwinax": "la_taverne_de_fwinax.pdf",
+    "Aux Dés Calés XVIIème": "aux_des_cales_XVII.pdf",
+    "Aux dés calés XVIIIème": "aux_des_cales_XVIII.pdf",
+    "Jovial": "jovial.pdf",
+    "Café Jeux Natema": "cafe_jeux_natema.pdf"
+}
+
 def get_menu_pdf_path(bar_name):
-    """Find the menu PDF for a given bar with fuzzy logic"""
+    """Find the menu PDF for a given bar with manual mapping and fuzzy logic fallback"""
     menus_dir = os.path.join(os.path.dirname(__file__), 'Menus_bars')
     if not os.path.exists(menus_dir):
         return None
-        
+    
+    # 1. Manual Mapping
+    if bar_name in BAR_MENU_MAPPING:
+        pdf_path = os.path.join(menus_dir, BAR_MENU_MAPPING[bar_name])
+        if os.path.exists(pdf_path):
+            return pdf_path
+
     normalized_name = normalize_string(bar_name)
     
     # Check for direct match first (e.g. le_3bis.pdf)
