@@ -22,5 +22,11 @@
         "password": "86a908c1a61f3e93c235dae19bf665cbfdf3c3e4f85062c58582931170f336b1",
         "icon": "C:\\Users\\Pc\\Documents\\Master 2 - Cergy\\APPLICATION GESTION DE PROJET\\Echec-Map\\icone_joueurs\\icone_joueurs\\icone_10.png",
         "role": "user"
+    },
+    {
+        "username": "oi",
+        "password": "f3029a66c61b61b41b428963a2fc134154a5383096c776f3b4064733c5463d90",
+        "icon": "C:\\Users\\Pc\\Documents\\Master 2 - Cergy\\APPLICATION GESTION DE PROJET\\Echec-Map\\icone_joueurs\\icone_joueurs\\icone_11.png",
+        "role": "user"
     }
 ]
