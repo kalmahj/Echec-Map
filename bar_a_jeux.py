@@ -88,6 +88,11 @@ if 'show_login_form' not in st.session_state:
 # ============================================================
 if st.session_state.role == 'guest':
     qp = st.query_params
+    
+    # Keep login form open if we are in the middle of avatar selection
+    if "avatar_select" in qp:
+        st.session_state.show_login_form = True
+
     if "session_user" in qp:
         saved_user = qp["session_user"]
         try:
