@@ -142,6 +142,11 @@ span {
    BUTTONS — iOS-style rounded, accent color
    ============================================================ */
 
+/* Force all text inside buttons to be white */
+.stButton>button * {
+    color: #ffffff !important;
+}
+
 .stButton>button {
     background-color: var(--color-accent) !important;
     color: #ffffff !important;
