@@ -182,7 +182,7 @@ with col_user:
                 st.rerun()
     else:
         # --- Guest: show login/register button ---
-        if st.button("🔑 Connexion / Inscription", key="top_login_btn", use_container_width=True):
+        if st.button("🔑 Je me connecte", key="top_login_btn", use_container_width=True):
             st.session_state.show_login_form = not st.session_state.show_login_form
 
 # --- Expandable Login/Register Form (slides down below header) ---
