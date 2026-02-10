@@ -254,13 +254,35 @@ label,
     background-color: #ffffff !important;
 }
 
-/* Multiselect - Arrondissements & Games */
+/* Multiselect & Selectbox Containers - STRICT ENFORCEMENT */
 .stMultiSelect>div>div,
 .stSelectbox>div>div {
     background-color: #ffffff !important;
     border: 2px solid var(--color-accent) !important;
     border-radius: var(--radius-md) !important;
     color: #000000 !important;
+    min-height: 42px;
+    /* Ensure same height as text input */
+}
+
+/* Text styling inside the boxes */
+.stSelectbox>div>div>div {
+    color: #000000 !important;
+    font-weight: 500 !important;
+}
+
+/* SVG Arrow Icons in Dropdowns */
+.stSelectbox svg,
+.stMultiSelect svg {
+    fill: var(--color-accent) !important;
+    color: var(--color-accent) !important;
+}
+
+/* Remove default blue outline on focus and replace with Teal */
+.stMultiSelect>div>div:focus-within,
+.stSelectbox>div>div:focus-within {
+    border-color: var(--color-accent-hover) !important;
+    box-shadow: 0 0 0 3px rgba(32, 74, 82, 0.15) !important;
 }
 
 /* Ensure selected tags in multiselect are visible */
