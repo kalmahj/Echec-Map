@@ -121,14 +121,21 @@ h3 {
 }
 
 p,
-div,
-span,
 label,
-input,
-textarea,
-select {
+li,
+.stMarkdown,
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] li {
     font-family: var(--font-body) !important;
     font-size: var(--font-size-base);
+    color: var(--color-text) !important;
+    /* Force Dark Text */
+}
+
+div,
+span {
+    font-family: var(--font-body) !important;
+    /* Don't force color on div/span to avoid breaking buttons/badges */
 }
 
 /* ============================================================
@@ -207,42 +214,78 @@ select {
    INPUTS — Dark glass inputs
    ============================================================ */
 
+/* Force labels to be dark */
+label,
+.st-ef {
+    color: var(--color-text) !important;
+}
+
+/* Captions (small text) */
+.stCaption {
+    color: var(--color-text-secondary) !important;
+}
+
 .stTextInput>div>div>input,
 .stTextArea>div>div>textarea,
 .stSelectbox>div>div>div,
 .stSelectbox>div>div>input {
-    background-color: var(--color-surface) !important;
+    background-color: #ffffff !important;
+    /* Fond clair (White) */
     color: #000000 !important;
-    /* Force Black Text */
+    /* Texte foncé (Black) */
     caret-color: #000000 !important;
-    border: 1px solid var(--color-border) !important;
+    border: 2px solid var(--color-accent) !important;
+    /* Contour foncé (Teal Accent) */
     border-radius: var(--radius-md) !important;
     font-size: var(--font-size-base) !important;
+    font-weight: 500 !important;
 }
 
 .stTextInput>div>div>input::placeholder,
 .stTextArea>div>div>textarea::placeholder {
-    color: #555555 !important;
-    /* Visible Dark Grey Placeholders */
+    color: #666666 !important;
     opacity: 1 !important;
 }
 
 .stTextInput>div>div>input:focus,
 .stTextArea>div>div>textarea:focus {
-    border-color: var(--color-accent) !important;
-    box-shadow: 0 0 0 2px rgba(32, 74, 82, 0.2) !important;
-    /* Matching Teal Shadow */
+    border-color: var(--color-accent-hover) !important;
+    box-shadow: 0 0 0 3px rgba(32, 74, 82, 0.15) !important;
+    background-color: #ffffff !important;
 }
 
-/* Multiselect */
-.stMultiSelect>div>div {
-    background-color: var(--color-surface) !important;
-    border: 1px solid var(--color-border) !important;
+/* Multiselect - Arrondissements & Games */
+.stMultiSelect>div>div,
+.stSelectbox>div>div {
+    background-color: #ffffff !important;
+    border: 2px solid var(--color-accent) !important;
     border-radius: var(--radius-md) !important;
     color: #000000 !important;
 }
 
-.stMultiSelect span {
+/* Ensure selected tags in multiselect are visible */
+.stMultiSelect span[data-baseweb="tag"] {
+    background-color: var(--color-accent-hover) !important;
+    color: #ffffff !important;
+    border-radius: var(--radius-sm);
+}
+
+/* Dropdown menu items */
+div[data-baseweb="popover"],
+div[data-baseweb="menu"],
+ul[data-testid="stSelectboxVirtualDropdown"] {
+    background-color: #ffffff !important;
+    border: 1px solid var(--color-border) !important;
+}
+
+li[role="option"] {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+}
+
+li[role="option"]:hover,
+li[role="option"][aria-selected="true"] {
+    background-color: var(--color-surface-hover) !important;
     color: #000000 !important;
 }
 
@@ -444,6 +487,13 @@ hr {
 .stAlert {
     border-radius: var(--radius-md) !important;
     font-size: var(--font-size-sm) !important;
+    color: #000000 !important;
+    /* Force Black Text if alert styling is missed */
+}
+
+/* Ensure strong text inside alerts is also black/bold */
+.stAlert strong {
+    color: #000000 !important;
 }
 
 /* ============================================================
