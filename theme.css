@@ -8,31 +8,31 @@
 
 :root {
     /* --- iOS System Colors --- */
-    --color-accent: #bdddbc;
-    /* iOS Blue */
-    --color-accent-hover: #0056CC;
-    --color-success: #34C759;
-    /* iOS Green */
-    --color-warning: #FF9500;
-    /* iOS Orange */
-    --color-danger: #FF3B30;
-    /* iOS Red */
-    --color-purple: #AF52DE;
-    --color-teal: #5AC8FA;
-    --color-pink: #FF2D55;
-
-    /* --- Dark Mode Backgrounds (Netflix layout feel) --- */
+    /* --- Brand Palette (Cream & Teal) --- */
     --color-bg: #f8f2e6;
-    --color-bg-secondary: #204a52;
-    --color-surface: #2C2C2E;
-    --color-surface-alt: #3A3A3C;
-    --color-surface-hover: #48484A;
+    /* Main Background (Cream) */
+    --color-bg-secondary: #ffffff;
+    /* Secondary/Cards (White) - Ensures readability */
+    --color-surface: #ffffff;
+    /* Inputs/Surfaces (White) */
+    --color-surface-alt: #f1f5f9;
+    --color-surface-hover: #e2e8f0;
 
-    /* --- Text --- */
-    --color-text: #000000;
-    --color-text-secondary: #000000;
-    --color-text-muted: #000000;
-    --color-border: #000000;
+    /* --- Brand Colors --- */
+    --color-accent: #204a52;
+    /* Logo Teal (Buttons/Tabs) */
+    --color-accent-hover: #16363c;
+    /* Darker Teal */
+    --color-success: #34C759;
+    --color-warning: #FF9500;
+    --color-danger: #FF3B30;
+
+    /* --- Text (High Contrast) --- */
+    --color-text: #1a1a1a;
+    /* Soft Black */
+    --color-text-secondary: #1a1a1a;
+    --color-text-muted: #1a1a1a;
+    --color-border: #1a1a1a;
 
     /* --- Typography --- */
     --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -74,7 +74,7 @@
 
 /* Header area */
 [data-testid="stHeader"] {
-    background-color: rgba(0, 0, 0, 0.85) !important;
+    background-color: rgba(248, 242, 230, 0.95) !important;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
 }
@@ -136,8 +136,8 @@ select {
    ============================================================ */
 
 .stButton>button {
-    background-color: var(--color-bg) !important;
-    color: var(--color-text) !important;
+    background-color: var(--color-accent) !important;
+    color: #ffffff !important;
     border: none !important;
     border-radius: var(--radius-md) !important;
     font-weight: 600 !important;
@@ -209,18 +209,29 @@ select {
 
 .stTextInput>div>div>input,
 .stTextArea>div>div>textarea,
-.stSelectbox>div>div>div {
+.stSelectbox>div>div>div,
+.stSelectbox>div>div>input {
     background-color: var(--color-surface) !important;
-    color: var(--color-text) !important;
+    color: #000000 !important;
+    /* Force Black Text */
+    caret-color: #000000 !important;
     border: 1px solid var(--color-border) !important;
     border-radius: var(--radius-md) !important;
     font-size: var(--font-size-base) !important;
 }
 
+.stTextInput>div>div>input::placeholder,
+.stTextArea>div>div>textarea::placeholder {
+    color: #555555 !important;
+    /* Visible Dark Grey Placeholders */
+    opacity: 1 !important;
+}
+
 .stTextInput>div>div>input:focus,
 .stTextArea>div>div>textarea:focus {
     border-color: var(--color-accent) !important;
-    box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2) !important;
+    box-shadow: 0 0 0 2px rgba(32, 74, 82, 0.2) !important;
+    /* Matching Teal Shadow */
 }
 
 /* Multiselect */
@@ -228,6 +239,11 @@ select {
     background-color: var(--color-surface) !important;
     border: 1px solid var(--color-border) !important;
     border-radius: var(--radius-md) !important;
+    color: #000000 !important;
+}
+
+.stMultiSelect span {
+    color: #000000 !important;
 }
 
 /* ============================================================
@@ -359,10 +375,12 @@ select {
     justify-content: flex-end;
     gap: var(--spacing-sm);
     padding: var(--spacing-xs);
-    background: rgba(28, 28, 30, 0.9);
+    background: rgba(255, 255, 255, 0.8);
+    /* Glass White */
     backdrop-filter: blur(10px);
     border-radius: var(--radius-full);
     margin-bottom: var(--spacing-md);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .profile-img-circle {
