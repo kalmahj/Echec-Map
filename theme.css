@@ -254,9 +254,8 @@ label,
     background-color: #ffffff !important;
 }
 
-/* Multiselect & Selectbox Containers - STRICT ENFORCEMENT */
-.stMultiSelect>div>div,
-.stSelectbox>div>div {
+/* Multiselect & Selectbox Containers - ROBUST ENFORCEMENT */
+div[data-baseweb="select"]>div {
     background-color: #ffffff !important;
     border: 2px solid var(--color-accent) !important;
     border-radius: var(--radius-md) !important;
@@ -265,24 +264,22 @@ label,
     /* Ensure same height as text input */
 }
 
-/* Text styling inside the boxes */
-.stSelectbox>div>div>div {
+/* Ensure inner text is black */
+div[data-baseweb="select"] * {
     color: #000000 !important;
-    font-weight: 500 !important;
 }
 
-/* SVG Arrow Icons in Dropdowns */
-.stSelectbox svg,
-.stMultiSelect svg {
+/* SVG Arrow Icons & Clear Buttons */
+div[data-baseweb="select"] svg {
     fill: var(--color-accent) !important;
     color: var(--color-accent) !important;
 }
 
 /* Remove default blue outline on focus and replace with Teal */
-.stMultiSelect>div>div:focus-within,
-.stSelectbox>div>div:focus-within {
+div[data-baseweb="select"]>div:focus-within {
     border-color: var(--color-accent-hover) !important;
     box-shadow: 0 0 0 3px rgba(32, 74, 82, 0.15) !important;
+    background-color: #ffffff !important;
 }
 
 /* Ensure selected tags in multiselect are visible */
