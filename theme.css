@@ -1,0 +1,490 @@
+/* ============================================================
+   ECHEC ET MAP — iOS-Inspired Theme
+   Netflix layout style + Apple iOS color palette
+   All sizes in rem/em for responsive mobile/desktop
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=SF+Pro+Display:wght@400;600;700&display=swap');
+
+:root {
+    /* --- iOS System Colors --- */
+    --color-accent: #bdddbc;
+    /* iOS Blue */
+    --color-accent-hover: #0056CC;
+    --color-success: #34C759;
+    /* iOS Green */
+    --color-warning: #FF9500;
+    /* iOS Orange */
+    --color-danger: #FF3B30;
+    /* iOS Red */
+    --color-purple: #AF52DE;
+    --color-teal: #5AC8FA;
+    --color-pink: #FF2D55;
+
+    /* --- Dark Mode Backgrounds (Netflix layout feel) --- */
+    --color-bg: #f8f2e6;
+    --color-bg-secondary: #204a52;
+    --color-surface: #2C2C2E;
+    --color-surface-alt: #3A3A3C;
+    --color-surface-hover: #48484A;
+
+    /* --- Text --- */
+    --color-text: #000000;
+    --color-text-secondary: #000000;
+    --color-text-muted: #000000;
+    --color-border: #000000;
+
+    /* --- Typography --- */
+    --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-size-3xl: 2rem;
+
+    /* --- Spacing --- */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+
+    /* --- Border Radius --- */
+    --radius-sm: 0.375rem;
+    --radius-md: 0.625rem;
+    --radius-lg: 0.875rem;
+    --radius-xl: 1rem;
+    --radius-full: 9999px;
+}
+
+/* ============================================================
+   GLOBAL OVERRIDES — Streamlit dark mode
+   ============================================================ */
+
+/* Main app background */
+.stApp,
+[data-testid="stAppViewContainer"] {
+    background-color: var(--color-bg) !important;
+    color: var(--color-text) !important;
+    font-family: var(--font-body) !important;
+}
+
+/* Header area */
+[data-testid="stHeader"] {
+    background-color: rgba(0, 0, 0, 0.85) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background-color: var(--color-bg-secondary) !important;
+}
+
+/* Hide sidebar arrow */
+section[data-testid="stSidebar"]>div>div:first-child {
+    display: none !important;
+}
+
+[data-testid="stSidebarCollapsedControl"] {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* ============================================================
+   TYPOGRAPHY
+   ============================================================ */
+
+h1 {
+    font-family: var(--font-heading) !important;
+    color: var(--color-text) !important;
+    font-weight: 700 !important;
+    font-size: var(--font-size-3xl) !important;
+    letter-spacing: -0.02em;
+}
+
+h2 {
+    font-family: var(--font-heading) !important;
+    color: var(--color-text) !important;
+    font-weight: 600 !important;
+    font-size: var(--font-size-2xl) !important;
+}
+
+h3 {
+    font-family: var(--font-heading) !important;
+    color: var(--color-text) !important;
+    font-weight: 600 !important;
+    font-size: var(--font-size-xl) !important;
+}
+
+p,
+div,
+span,
+label,
+input,
+textarea,
+select {
+    font-family: var(--font-body) !important;
+    font-size: var(--font-size-base);
+}
+
+/* ============================================================
+   BUTTONS — iOS-style rounded, accent color
+   ============================================================ */
+
+.stButton>button {
+    background-color: var(--color-bg) !important;
+    color: var(--color-text) !important;
+    border: none !important;
+    border-radius: var(--radius-md) !important;
+    font-weight: 600 !important;
+    font-size: var(--font-size-sm) !important;
+    padding: 0.625em 1.25em !important;
+    transition: all 0.2s ease !important;
+    width: 100%;
+}
+
+.stButton>button:hover {
+    background-color: var(--color-accent-hover) !important;
+    transform: scale(1.02);
+}
+
+.stButton>button:active {
+    transform: scale(0.98);
+}
+
+/* Download button */
+.stDownloadButton>button {
+    background-color: var(--color-surface) !important;
+    border: 1px solid var(--color-accent) !important;
+    color: var(--color-accent) !important;
+    border-radius: var(--radius-md) !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+}
+
+.stDownloadButton>button:hover {
+    background-color: var(--color-accent) !important;
+    color: var(--color-text) !important;
+}
+
+/* ============================================================
+   TABS — Clean iOS segmented control style
+   ============================================================ */
+
+.stTabs [data-baseweb="tab-list"] {
+    background-color: var(--color-bg-secondary);
+    border-radius: var(--radius-lg);
+    padding: 0.25rem;
+    gap: 0;
+}
+
+.stTabs [data-baseweb="tab"] {
+    background-color: transparent !important;
+    border-radius: var(--radius-md) !important;
+    color: var(--color-text-secondary) !important;
+    font-weight: 500 !important;
+    font-size: var(--font-size-sm) !important;
+    padding: 0.5rem 1rem !important;
+    transition: all 0.2s ease;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: var(--color-accent) !important;
+    color: var(--color-text) !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+}
+
+/* ============================================================
+   INPUTS — Dark glass inputs
+   ============================================================ */
+
+.stTextInput>div>div>input,
+.stTextArea>div>div>textarea,
+.stSelectbox>div>div>div {
+    background-color: var(--color-surface) !important;
+    color: var(--color-text) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: var(--radius-md) !important;
+    font-size: var(--font-size-base) !important;
+}
+
+.stTextInput>div>div>input:focus,
+.stTextArea>div>div>textarea:focus {
+    border-color: var(--color-accent) !important;
+    box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2) !important;
+}
+
+/* Multiselect */
+.stMultiSelect>div>div {
+    background-color: var(--color-surface) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: var(--radius-md) !important;
+}
+
+/* ============================================================
+   CARDS & CONTAINERS
+   ============================================================ */
+
+/* Bar detail card */
+.bar-card {
+    background-color: var(--color-bg-secondary);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    border-left: 4px solid var(--color-accent);
+    margin-bottom: var(--spacing-md);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bar-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.bar-box {
+    background: var(--color-bg-secondary);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    margin: var(--spacing-xs) 0;
+    cursor: pointer;
+    border: 1px solid var(--color-border);
+    transition: background-color 0.2s ease;
+}
+
+.bar-box:hover {
+    background: var(--color-surface);
+}
+
+/* ============================================================
+   SCROLL INDICATOR
+   ============================================================ */
+
+@keyframes bounce {
+
+    0%,
+    20%,
+    50%,
+    80%,
+    100% {
+        transform: translateY(0);
+    }
+
+    40% {
+        transform: translateY(-0.625rem);
+    }
+
+    60% {
+        transform: translateY(-0.3rem);
+    }
+}
+
+.scroll-indicator {
+    text-align: center;
+    margin-top: var(--spacing-md);
+    color: var(--color-accent);
+    font-weight: 600;
+    animation: bounce 2s infinite;
+    font-size: var(--font-size-xl);
+    cursor: pointer;
+}
+
+/* ============================================================
+   FORUM — Comment styling
+   ============================================================ */
+
+.comment-box {
+    background-color: var(--color-bg-secondary);
+    border-left: 3px solid var(--color-accent);
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin: var(--spacing-xs) 0;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.comment-author {
+    font-weight: 600;
+    color: var(--color-accent);
+}
+
+.comment-text {
+    color: var(--color-text);
+    font-size: var(--font-size-base);
+}
+
+/* Reactions */
+.reaction-container {
+    display: flex;
+    flex-direction: row;
+    gap: var(--spacing-xs);
+    flex-wrap: wrap;
+    margin-top: var(--spacing-xs);
+}
+
+.reaction-btn {
+    background: none !important;
+    border: none !important;
+    padding: 0 var(--spacing-xs) !important;
+    cursor: pointer;
+    font-size: var(--font-size-lg) !important;
+    line-height: 1.2;
+    transition: transform 0.15s ease;
+}
+
+.reaction-btn:hover {
+    transform: scale(1.3);
+}
+
+/* ============================================================
+   PROFILE HEADER
+   ============================================================ */
+
+.profile-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs);
+    background: rgba(28, 28, 30, 0.9);
+    backdrop-filter: blur(10px);
+    border-radius: var(--radius-full);
+    margin-bottom: var(--spacing-md);
+}
+
+.profile-img-circle {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--color-accent);
+}
+
+.profile-name {
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+/* ============================================================
+   AVATAR SELECTION
+   ============================================================ */
+
+.avatar-grid-btn {
+    border: 2px solid transparent;
+    border-radius: var(--radius-md);
+    transition: all 0.2s ease;
+}
+
+.avatar-grid-btn:hover {
+    border-color: var(--color-accent);
+    transform: scale(1.05);
+}
+
+.selected-avatar {
+    border: 3px solid var(--color-success);
+    border-radius: var(--radius-md);
+    padding: 2px;
+}
+
+/* ============================================================
+   FORMS — Streamlit form styling
+   ============================================================ */
+
+[data-testid="stForm"] {
+    background-color: var(--color-bg-secondary) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: var(--radius-lg) !important;
+    padding: var(--spacing-lg) !important;
+}
+
+/* ============================================================
+   DIVIDERS
+   ============================================================ */
+
+hr {
+    border-color: var(--color-border) !important;
+    opacity: 0.5;
+}
+
+/* ============================================================
+   INFO / SUCCESS / ERROR / WARNING BANNERS
+   ============================================================ */
+
+.stAlert {
+    border-radius: var(--radius-md) !important;
+    font-size: var(--font-size-sm) !important;
+}
+
+/* ============================================================
+   MAP CONTAINER
+   ============================================================ */
+
+iframe {
+    border-radius: var(--radius-lg) !important;
+    border: 1px solid var(--color-border) !important;
+}
+
+/* ============================================================
+   MOBILE RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 600px) {
+    :root {
+        --font-size-3xl: 1.5rem;
+        --font-size-2xl: 1.25rem;
+        --font-size-xl: 1.125rem;
+        --font-size-lg: 1rem;
+        --font-size-base: 0.9375rem;
+    }
+
+    .profile-header {
+        justify-content: center;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        font-size: var(--font-size-xs) !important;
+        padding: 0.375rem 0.5rem !important;
+    }
+}
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+
+[data-testid="stToast"] {
+    background-color: var(--color-bg-secondary) !important;
+    color: var(--color-text) !important;
+    border-radius: var(--radius-md) !important;
+    border: 1px solid var(--color-border) !important;
+}
+
+/* ============================================================
+   SCROLLBAR — Slim dark
+   ============================================================ */
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-surface-alt);
+    border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted);
+}

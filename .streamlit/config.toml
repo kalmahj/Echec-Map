@@ -1,8 +1,8 @@
 [theme]
-primaryColor = "#1E90FF"  # Dodger Blue
-backgroundColor = "#F0F8FF"  # Alice Blue
-secondaryBackgroundColor = "#E6F3FF"  # Light Blue
-textColor = "#1A1A2E"  # Dark Blue-Gray
+primaryColor = "#007AFF"
+backgroundColor = "#000000"
+secondaryBackgroundColor = "#1C1C1E"
+textColor = "#FFFFFF"
 font = "sans serif"
 
 [server]
