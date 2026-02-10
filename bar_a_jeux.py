@@ -569,7 +569,7 @@ try:
                 date_time = st.text_input("Quand :", placeholder="ex: Demain 19h")
                 message = st.text_area("Message :")
 
-                if st.form_submit_button("Publier"):
+                if st.form_submit_button("Publier", type="primary"):
                     if message and game_choice:
                         if contains_profanity(message) or contains_profanity(game_choice):
                             st.error("⚠️ Votre message contient des termes inappropriés et n'a pas été publié.")
@@ -691,7 +691,7 @@ try:
                             with col_c2:
                                 c_text = st.text_input("Commentaire:", key=f"c_text_{idx}")
 
-                            if st.form_submit_button("💬 Commenter"):
+                            if st.form_submit_button("💬 Commenter", type="primary"):
                                 if c_text:
                                     if contains_profanity(c_text):
                                         st.error("⚠️ Message inapproprié.")

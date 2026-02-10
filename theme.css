@@ -168,6 +168,19 @@ span {
     transform: scale(0.98);
 }
 
+/* Primary Button (Forum Actions) - Uses requested #16363c */
+.stButton button[kind="primary"] {
+    background-color: #16363c !important;
+    border: none !important;
+    color: #ffffff !important;
+}
+
+.stButton button[kind="primary"]:hover {
+    background-color: #204a52 !important;
+    /* Slightly lighter on hover */
+    color: #ffffff !important;
+}
+
 /* Download button */
 .stDownloadButton>button {
     background-color: var(--color-surface) !important;
