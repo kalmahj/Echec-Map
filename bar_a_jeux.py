@@ -137,24 +137,23 @@ if len(st.session_state.game_requests) == 0:
 # ============================================================
 # HEADER WITH PROFILE / LOGIN BUTTON (top-right)
 # ============================================================
-col_header, col_user = st.columns([2, 1])
+col_spacer, col_header, col_user = st.columns([1, 1, 1])
 
 with col_header:
     if os.path.exists(LOGO_PATH):
-        # Read and encode the local image to base64
         with open(LOGO_PATH, "rb") as f:
             data = base64.b64encode(f.read()).decode("utf-8")
         
-        # Create an HTML anchor tag with the image inside
-        # Replace the href URL with your actual landing page URL
         logo_html = f"""
-            <a href="https://echec-map.streamlit.app/" target="_self">
-                <img src="data:image/png;base64,{data}" width="200" style="cursor: pointer;">
-            </a>
+            <div style="display: flex; justify-content: center; width: 100%;">
+                <a href="https://echec-map.streamlit.app/" target="_self">
+                    <img src="data:image/png;base64,{data}" width="200" style="cursor: pointer;">
+                </a>
+            </div>
         """
         st.markdown(logo_html, unsafe_allow_html=True)
     else:
-        st.markdown("<h1>🎮 Echec et Map</h1>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center;'>🎮 Echec et Map</h1>", unsafe_allow_html=True)
 
 with col_user:
     if st.session_state.role != 'guest':
