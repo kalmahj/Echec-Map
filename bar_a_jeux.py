@@ -516,7 +516,7 @@ try:
             elif selected_games_multi and map_data.empty:
                 st.warning("🔍 Aucun bar ne propose ces jeux. Essayez avec d'autres jeux ou faites une demande ci-dessous !")
             else:
-                st.info("Sélectionnez un ou plusieurs jeux à gauche pour afficher les bars qui les proposent.")
+                st.info("Sélectionnez un ou plusieurs jeux pour afficher les bars qui les proposent.")
 
         st.markdown("---")
         st.markdown("### ➕ Demander un Jeu (ou modification)")
