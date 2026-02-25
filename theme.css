@@ -845,66 +845,104 @@ iframe {
 }
 
 /* ============================================================
-   DIALOG / POPUP MODAL — Blurred backdrop, light theme
+   DIALOG / POPUP MODAL — Blurred backdrop, LIGHT theme (hardcoded)
+   Streamlit dialogs may not inherit :root vars, so we use
+   explicit hex colors matching the app's cream/teal palette.
    ============================================================ */
 
-/* Streamlit dialog overlay backdrop */
+/* Backdrop overlay */
 div[data-testid="stModal"]>div:first-child {
-    background: rgba(0, 0, 0, 0.4) !important;
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
+    background: rgba(0, 0, 0, 0.35) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
 }
 
-/* Dialog box — force light theme */
-div[data-testid="stModal"] [data-testid="stModalBody"] {
-    background: var(--color-bg) !important;
-    border-radius: var(--radius-lg) !important;
-    padding: var(--spacing-lg) !important;
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.15) !important;
+/* --- Dialog container --- */
+div[data-testid="stModal"]>div:last-child>div {
+    background-color: #f8f2e6 !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2) !important;
     animation: modalSlideIn 0.3s ease-out;
-    color: var(--color-text) !important;
 }
 
-/* Force all text inside dialog to be dark */
-div[data-testid="stModal"] [data-testid="stModalBody"] p,
-div[data-testid="stModal"] [data-testid="stModalBody"] h1,
-div[data-testid="stModal"] [data-testid="stModalBody"] h2,
-div[data-testid="stModal"] [data-testid="stModalBody"] h3,
-div[data-testid="stModal"] [data-testid="stModalBody"] h4,
-div[data-testid="stModal"] [data-testid="stModalBody"] span,
-div[data-testid="stModal"] [data-testid="stModalBody"] div,
-div[data-testid="stModal"] [data-testid="stModalBody"] label {
-    color: var(--color-text) !important;
-}
-
-/* Force metric values inside dialog to be dark */
-div[data-testid="stModal"] [data-testid="stMetricValue"] {
-    color: var(--color-accent) !important;
-}
-
-div[data-testid="stModal"] [data-testid="stMetricLabel"] {
-    color: var(--color-text-secondary) !important;
-}
-
-/* Dialog header/title bar */
+/* Header bar */
 div[data-testid="stModal"] [data-testid="stModalHeader"] {
-    background: var(--color-bg) !important;
-    color: var(--color-text) !important;
+    background-color: #f8f2e6 !important;
+    color: #1c1c1e !important;
+    border-bottom: 1px solid #e8dcc8 !important;
 }
 
-/* Dialog close button */
+div[data-testid="stModal"] [data-testid="stModalHeader"] p,
+div[data-testid="stModal"] [data-testid="stModalHeader"] span {
+    color: #1c1c1e !important;
+    font-weight: 600 !important;
+}
+
+/* Close button */
 div[data-testid="stModal"] button[aria-label="Close"] {
-    color: var(--color-text) !important;
+    color: #1c1c1e !important;
 }
 
-/* Containers inside dialog */
+div[data-testid="stModal"] button[aria-label="Close"]:hover {
+    background: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Body */
+div[data-testid="stModal"] [data-testid="stModalBody"] {
+    background-color: #f8f2e6 !important;
+    color: #1c1c1e !important;
+    padding: 1.5rem !important;
+}
+
+/* ALL text inside dialog */
+div[data-testid="stModal"] p,
+div[data-testid="stModal"] h1,
+div[data-testid="stModal"] h2,
+div[data-testid="stModal"] h3,
+div[data-testid="stModal"] h4,
+div[data-testid="stModal"] h5,
+div[data-testid="stModal"] span,
+div[data-testid="stModal"] label,
+div[data-testid="stModal"] li {
+    color: #1c1c1e !important;
+}
+
+/* Captions / muted text */
+div[data-testid="stModal"] [data-testid="stCaptionContainer"] span {
+    color: #636366 !important;
+}
+
+/* Metric values */
+div[data-testid="stModal"] [data-testid="stMetricValue"] {
+    color: #204a52 !important;
+}
+
+div[data-testid="stModal"] [data-testid="stMetricLabel"] label {
+    color: #636366 !important;
+}
+
+/* Dividers inside dialog */
+div[data-testid="stModal"] hr {
+    border-color: #e8dcc8 !important;
+}
+
+/* Containers/cards inside dialog */
 div[data-testid="stModal"] [data-testid="stVerticalBlock"] {
     background: transparent !important;
 }
 
-div[data-testid="stModal"] .stContainer {
-    background: var(--color-bg-secondary) !important;
-    border-color: var(--color-border) !important;
+div[data-testid="stModal"] [data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #ffffff !important;
+    border-color: #e8dcc8 !important;
+}
+
+/* Markdown blocks inside dialog */
+div[data-testid="stModal"] [data-testid="stMarkdown"] {
+    color: #1c1c1e !important;
+}
+
+div[data-testid="stModal"] [data-testid="stMarkdown"] p {
+    color: #1c1c1e !important;
 }
 
 @keyframes modalSlideIn {
