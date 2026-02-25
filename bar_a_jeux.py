@@ -490,77 +490,124 @@ try:
             if selected_games_multi and not map_data.empty:
                 st.markdown(f"### 📋 {len(map_data)} Bar(s) trouvé(s)")
 
-                # Use tabs as a carousel when there are multiple bars
+                # --- Bar Carousel Selector (instead of squished tabs) ---
                 bar_names = [row['Nom'] for _, row in map_data.iterrows()]
+                
+                # Initialize selected bar in carousel
+                if 'jeux_selected_bar' not in st.session_state or st.session_state.jeux_selected_bar not in bar_names:
+                    st.session_state.jeux_selected_bar = bar_names[0]
+
                 if len(bar_names) > 1:
-                    bar_tabs = st.tabs([f"🍷 {name}" for name in bar_names])
-                else:
-                    bar_tabs = [st.container()]
+                    # Carousel with arrow buttons and bar name buttons
+                    carousel_cols = st.columns([1] + [3] * min(len(bar_names), 3) + [1])
+                    
+                    with carousel_cols[0]:
+                        if st.button("◀", key="carousel_prev", use_container_width=True):
+                            curr_idx = bar_names.index(st.session_state.jeux_selected_bar)
+                            st.session_state.jeux_selected_bar = bar_names[(curr_idx - 1) % len(bar_names)]
+                            st.rerun()
+                    
+                    # Show bar name buttons (scrollable set)
+                    curr_idx = bar_names.index(st.session_state.jeux_selected_bar)
+                    # Show up to 3 bars at a time centered around current
+                    visible_count = min(3, len(bar_names))
+                    start = max(0, min(curr_idx - visible_count // 2, len(bar_names) - visible_count))
+                    visible_bars = bar_names[start:start + visible_count]
+                    
+                    for i, bname in enumerate(visible_bars):
+                        with carousel_cols[1 + i]:
+                            is_active = (bname == st.session_state.jeux_selected_bar)
+                            btn_type = "primary" if is_active else "secondary"
+                            if st.button(f"🍷 {bname}", key=f"carousel_bar_{start + i}", type=btn_type, use_container_width=True):
+                                st.session_state.jeux_selected_bar = bname
+                                st.rerun()
+                    
+                    with carousel_cols[-1]:
+                        if st.button("▶", key="carousel_next", use_container_width=True):
+                            curr_idx = bar_names.index(st.session_state.jeux_selected_bar)
+                            st.session_state.jeux_selected_bar = bar_names[(curr_idx + 1) % len(bar_names)]
+                            st.rerun()
+                    
+                    st.caption(f"Bar {bar_names.index(st.session_state.jeux_selected_bar) + 1} / {len(bar_names)}")
 
-                for tab_container, (idx, row) in zip(bar_tabs, map_data.iterrows()):
-                    with tab_container:
-                        bar_name = row['Nom']
+                # --- Render selected bar details ---
+                sel_bar_name = st.session_state.jeux_selected_bar
+                sel_bar_rows = map_data[map_data['Nom'] == sel_bar_name]
+                if not sel_bar_rows.empty:
+                    row = sel_bar_rows.iloc[0]
+                    idx = sel_bar_rows.index[0]
+                    
+                    # Show bar card WITHOUT the default games list
+                    render_bar_detail_card(row, sel_bar_name, st.session_state.games_data, idx, "games", show_games=False)
 
-                        # Show bar card WITHOUT the default games list
-                        render_bar_detail_card(row, bar_name, st.session_state.games_data, idx, "games", show_games=False)
+                    # Show matched games with clickable detail popup
+                    st.markdown("### 🎲 Jeux recherchés disponibles ici")
+                    found_games = st.session_state.games_data[
+                        (st.session_state.games_data['bar_name'] == sel_bar_name) &
+                        (st.session_state.games_data['game'].isin(selected_games_multi))
+                    ]['game'].tolist()
 
-                        # Show matched games with details from complete_games_data
-                        st.markdown("### 🎲 Jeux recherchés disponibles ici")
-                        found_games = st.session_state.games_data[
-                            (st.session_state.games_data['bar_name'] == bar_name) &
-                            (st.session_state.games_data['game'].isin(selected_games_multi))
-                        ]['game'].tolist()
+                    # --- Trigger game detail dialog if requested ---
+                    if st.session_state.get('_open_jeux_game_dialog', False):
+                        st.session_state['_open_jeux_game_dialog'] = False
+                        from modules.game_library import _show_game_dialog
+                        _show_game_dialog()
 
-                        for g in sorted(found_games):
-                            # Try to find details from complete_games_data
-                            if not st.session_state.complete_games_data.empty:
-                                game_match = st.session_state.complete_games_data[
-                                    st.session_state.complete_games_data['nom'].str.lower() == g.lower()
-                                ]
-                                if not game_match.empty:
-                                    game_info = game_match.iloc[0]
-                                    game_type = str(game_info.get('type', '')) if not pd.isna(game_info.get('type', '')) else ''
-                                    players_min = game_info.get('nb_joueurs_min')
-                                    players_max = game_info.get('nb_joueur_max')
-                                    p_str = ""
-                                    if not pd.isna(players_min):
-                                        p_str = f"{int(players_min)}"
-                                        if not pd.isna(players_max) and int(players_max) != int(players_min):
-                                            p_str += f"–{int(players_max)}"
-                                        p_str += " joueurs"
-                                    dur_min = game_info.get('duree_min')
-                                    dur_max = game_info.get('duree_max')
-                                    d_str = ""
-                                    if not pd.isna(dur_min):
-                                        d_str = f"{int(dur_min)}"
-                                        if not pd.isna(dur_max) and int(dur_max) != int(dur_min):
-                                            d_str += f"–{int(dur_max)}"
-                                        d_str += " min"
+                    for g in sorted(found_games):
+                        # Try to find details from complete_games_data
+                        if not st.session_state.complete_games_data.empty:
+                            game_match = st.session_state.complete_games_data[
+                                st.session_state.complete_games_data['nom'].str.lower() == g.lower()
+                            ]
+                            if not game_match.empty:
+                                game_info = game_match.iloc[0]
+                                game_type = str(game_info.get('type', '')) if not pd.isna(game_info.get('type', '')) else ''
+                                players_min = game_info.get('nb_joueurs_min')
+                                players_max = game_info.get('nb_joueur_max')
+                                p_str = ""
+                                if not pd.isna(players_min):
+                                    p_str = f"{int(players_min)}"
+                                    if not pd.isna(players_max) and int(players_max) != int(players_min):
+                                        p_str += f"–{int(players_max)}"
+                                    p_str += " joueurs"
+                                dur_min = game_info.get('duree_min')
+                                dur_max = game_info.get('duree_max')
+                                d_str = ""
+                                if not pd.isna(dur_min):
+                                    d_str = f"{int(dur_min)}"
+                                    if not pd.isna(dur_max) and int(dur_max) != int(dur_min):
+                                        d_str += f"–{int(dur_max)}"
+                                    d_str += " min"
 
-                                    with st.container(border=True):
-                                        img_url = game_info.get('lien_photo', '')
-                                        if not pd.isna(img_url) and img_url:
-                                            st.image(img_url, width=80)
-                                        st.markdown(f"**✅ {g}**")
-                                        details_parts = [x for x in [game_type, p_str, d_str] if x]
-                                        if details_parts:
-                                            st.caption(" · ".join(details_parts))
-                                else:
-                                    st.markdown(f"✅ **{g}**")
+                                with st.container(border=True):
+                                    img_url = game_info.get('lien_photo', '')
+                                    if not pd.isna(img_url) and img_url:
+                                        st.image(img_url, width=80)
+                                    st.markdown(f"**✅ {g}**")
+                                    details_parts = [x for x in [game_type, p_str, d_str] if x]
+                                    if details_parts:
+                                        st.caption(" · ".join(details_parts))
+                                    # Clickable detail button
+                                    if st.button("🔍 Voir détails", key=f"jeux_detail_{sel_bar_name}_{g}", use_container_width=True):
+                                        st.session_state['_dialog_game_data'] = game_info.to_dict()
+                                        st.session_state['_open_jeux_game_dialog'] = True
+                                        st.rerun()
                             else:
                                 st.markdown(f"✅ **{g}**")
-
-                        # Other games
-                        st.markdown("### 📜 Autres jeux disponibles")
-                        all_bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == bar_name]['game'].tolist()
-                        other_games = [g for g in all_bar_games if g not in found_games]
-
-                        if other_games:
-                            with st.container(height=200):
-                                for g in sorted(other_games):
-                                    st.markdown(f"- {g}")
                         else:
-                            st.info("Pas d'autres jeux disponibles.")
+                            st.markdown(f"✅ **{g}**")
+
+                    # Other games (simple list)
+                    st.markdown("### 📜 Autres jeux disponibles")
+                    all_bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == sel_bar_name]['game'].tolist()
+                    other_games = [g for g in all_bar_games if g not in found_games]
+
+                    if other_games:
+                        with st.container(height=200):
+                            for g in sorted(other_games):
+                                st.markdown(f"- {g}")
+                    else:
+                        st.info("Pas d'autres jeux disponibles.")
 
             elif selected_games_multi and map_data.empty:
                 st.warning("🔍 Aucun bar ne propose ces jeux. Essayez avec d'autres jeux ou faites une demande ci-dessous !")

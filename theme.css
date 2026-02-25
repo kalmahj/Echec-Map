@@ -204,7 +204,7 @@ span {
     background-color: var(--color-bg-secondary);
     border-radius: var(--radius-lg);
     padding: 0.25rem;
-    gap: 0;
+    gap: 0.25rem;
     display: flex;
     justify-content: center;
     width: 100%;
@@ -227,14 +227,14 @@ span {
     padding: 0.5rem 0.75rem !important;
     transition: all 0.2s ease;
     white-space: nowrap;
-    flex: 1 1 0;
-    min-width: 0;
+    flex: 0 1 auto;
+    min-width: fit-content;
     text-align: center;
 }
 
 .stTabs [aria-selected="true"] {
     background-color: var(--color-accent) !important;
-    color: var(--color-text) !important;
+    color: #ffffff !important;
     font-weight: 600 !important;
     box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
 }
@@ -570,11 +570,17 @@ iframe {
         justify-content: center;
     }
 
+    /* Main app tabs: 2×2 grid on mobile */
+    .stTabs [data-baseweb="tab-list"] {
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+
     .stTabs [data-baseweb="tab"] {
-        font-size: 0.65rem !important;
-        padding: 0.35rem 0.3rem !important;
-        flex: 1 1 0;
-        min-width: 0;
+        font-size: 0.8rem !important;
+        padding: 0.5rem 0.5rem !important;
+        flex: 1 1 45%;
+        min-width: 45%;
     }
 
     /* Game library cards: single column on mobile */
@@ -839,23 +845,66 @@ iframe {
 }
 
 /* ============================================================
-   DIALOG / POPUP MODAL — Blurred backdrop
+   DIALOG / POPUP MODAL — Blurred backdrop, light theme
    ============================================================ */
 
 /* Streamlit dialog overlay backdrop */
 div[data-testid="stModal"]>div:first-child {
-    background: rgba(0, 0, 0, 0.5) !important;
+    background: rgba(0, 0, 0, 0.4) !important;
     backdrop-filter: blur(8px) !important;
     -webkit-backdrop-filter: blur(8px) !important;
 }
 
-/* Dialog box styling */
+/* Dialog box — force light theme */
 div[data-testid="stModal"] [data-testid="stModalBody"] {
-    background: var(--color-bg-secondary) !important;
+    background: var(--color-bg) !important;
     border-radius: var(--radius-lg) !important;
     padding: var(--spacing-lg) !important;
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2) !important;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.15) !important;
     animation: modalSlideIn 0.3s ease-out;
+    color: var(--color-text) !important;
+}
+
+/* Force all text inside dialog to be dark */
+div[data-testid="stModal"] [data-testid="stModalBody"] p,
+div[data-testid="stModal"] [data-testid="stModalBody"] h1,
+div[data-testid="stModal"] [data-testid="stModalBody"] h2,
+div[data-testid="stModal"] [data-testid="stModalBody"] h3,
+div[data-testid="stModal"] [data-testid="stModalBody"] h4,
+div[data-testid="stModal"] [data-testid="stModalBody"] span,
+div[data-testid="stModal"] [data-testid="stModalBody"] div,
+div[data-testid="stModal"] [data-testid="stModalBody"] label {
+    color: var(--color-text) !important;
+}
+
+/* Force metric values inside dialog to be dark */
+div[data-testid="stModal"] [data-testid="stMetricValue"] {
+    color: var(--color-accent) !important;
+}
+
+div[data-testid="stModal"] [data-testid="stMetricLabel"] {
+    color: var(--color-text-secondary) !important;
+}
+
+/* Dialog header/title bar */
+div[data-testid="stModal"] [data-testid="stModalHeader"] {
+    background: var(--color-bg) !important;
+    color: var(--color-text) !important;
+}
+
+/* Dialog close button */
+div[data-testid="stModal"] button[aria-label="Close"] {
+    color: var(--color-text) !important;
+}
+
+/* Containers inside dialog */
+div[data-testid="stModal"] [data-testid="stVerticalBlock"] {
+    background: transparent !important;
+}
+
+div[data-testid="stModal"] .stContainer {
+    background: var(--color-bg-secondary) !important;
+    border-color: var(--color-border) !important;
 }
 
 @keyframes modalSlideIn {
@@ -868,4 +917,76 @@ div[data-testid="stModal"] [data-testid="stModalBody"] {
         opacity: 1;
         transform: scale(1) translateY(0);
     }
+}
+
+/* ============================================================
+   LES JEUX — Bar carousel / scrollable bar selector
+   ============================================================ */
+
+.bar-carousel {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.bar-carousel-inner {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex: 1;
+    padding: 0.25rem 0;
+}
+
+.bar-carousel-inner::-webkit-scrollbar {
+    display: none;
+}
+
+.bar-carousel-btn {
+    flex-shrink: 0;
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    color: var(--color-text);
+    transition: all 0.2s ease;
+}
+
+.bar-carousel-btn:hover {
+    background: var(--color-surface-hover);
+}
+
+.bar-carousel-btn.active {
+    background: var(--color-accent);
+    color: #ffffff;
+    border-color: var(--color-accent);
+    font-weight: 600;
+}
+
+.bar-carousel-arrow {
+    flex-shrink: 0;
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    color: var(--color-text);
+}
+
+.bar-carousel-arrow:hover {
+    background: var(--color-accent);
+    color: #ffffff;
 }
