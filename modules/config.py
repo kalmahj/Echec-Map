@@ -18,6 +18,7 @@ INSULTS_PATH = os.path.join(BASE_DIR, 'liste_insultes.txt')
 MENUS_DIR = os.path.join(BASE_DIR, 'Menus_bars')
 CSV_GAMES_DIR = os.path.join(BASE_DIR, 'Scraping Liste Jeux')
 THEME_CSS_PATH = os.path.join(BASE_DIR, 'theme.css')
+COMPLETE_GAMES_CSV_PATH = os.path.join(BASE_DIR, 'liste_jeux_complet.csv')
 
 # --- Mapping: CSV filename -> Bar display name ---
 BAR_CSV_MAPPING = {

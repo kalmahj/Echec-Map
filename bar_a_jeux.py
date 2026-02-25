@@ -24,7 +24,8 @@ from modules.auth import (
     load_users, verify_user, contains_profanity
 )
 from modules.data import (
-    load_data, load_games_from_csv, load_forum_comments, load_game_requests
+    load_data, load_games_from_csv, load_forum_comments, load_game_requests,
+    load_complete_games
 )
 from modules.forum import (
     save_forum_comment, save_game_request,
@@ -33,6 +34,7 @@ from modules.forum import (
     approve_game_request, reject_game_request
 )
 from modules.components import render_bar_detail_card, render_login_page
+from modules.game_library import render_game_library_tab
 
 # ============================================================
 # PAGE CONFIG
@@ -72,6 +74,8 @@ if 'game_requests' not in st.session_state:
     st.session_state.game_requests = []
 if 'games_data' not in st.session_state:
     st.session_state.games_data = pd.DataFrame()
+if 'complete_games_data' not in st.session_state:
+    st.session_state.complete_games_data = pd.DataFrame()
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = True      # Auto-login as guest
 if 'username' not in st.session_state:
@@ -131,6 +135,8 @@ if len(st.session_state.forum_posts) == 0:
 
 if st.session_state.games_data.empty:
     st.session_state.games_data = load_games_from_csv()
+if st.session_state.complete_games_data.empty:
+    st.session_state.complete_games_data = load_complete_games()
 if len(st.session_state.game_requests) == 0:
     st.session_state.game_requests = load_game_requests()
 
@@ -222,9 +228,9 @@ try:
     # TABS
     # ============================================================
     if st.session_state.admin_logged_in:
-        tab1, tab2, tab3, tab4 = st.tabs(["🍷 Les Bars", "🎲 Les Jeux", "💬 Forum", "🔧 Admin"])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["🍷 Les Bars", "🎲 Les Jeux", "📚 Bibliothèque", "💬 Forum", "🔧 Admin"])
     else:
-        tab1, tab2, tab3 = st.tabs(["🍷 Les Bars", "🎲 Les Jeux", "💬 Forum"])
+        tab1, tab2, tab3, tab4 = st.tabs(["🍷 Les Bars", "🎲 Les Jeux", "📚 Bibliothèque", "💬 Forum"])
 
     # ============================================================
     # TAB 1: LES BARS
@@ -489,7 +495,7 @@ try:
 
                     render_bar_detail_card(row, bar_name, st.session_state.games_data, idx, "games")
 
-                    # Show matched games specifically
+                    # Show matched games with details from complete_games_data
                     st.markdown("### 🎲 Jeux recherchés disponibles ici")
                     found_games = st.session_state.games_data[
                         (st.session_state.games_data['bar_name'] == bar_name) &
@@ -497,7 +503,43 @@ try:
                     ]['game'].tolist()
 
                     for g in sorted(found_games):
-                        st.markdown(f"✅ **{g}**")
+                        # Try to find details from complete_games_data
+                        if not st.session_state.complete_games_data.empty:
+                            game_match = st.session_state.complete_games_data[
+                                st.session_state.complete_games_data['nom'].str.lower() == g.lower()
+                            ]
+                            if not game_match.empty:
+                                game_info = game_match.iloc[0]
+                                game_type = str(game_info.get('type', '')) if not pd.isna(game_info.get('type', '')) else ''
+                                players_min = game_info.get('nb_joueurs_min')
+                                players_max = game_info.get('nb_joueur_max')
+                                p_str = ""
+                                if not pd.isna(players_min):
+                                    p_str = f"{int(players_min)}"
+                                    if not pd.isna(players_max) and int(players_max) != int(players_min):
+                                        p_str += f"–{int(players_max)}"
+                                    p_str += " joueurs"
+                                dur_min = game_info.get('duree_min')
+                                dur_max = game_info.get('duree_max')
+                                d_str = ""
+                                if not pd.isna(dur_min):
+                                    d_str = f"{int(dur_min)}"
+                                    if not pd.isna(dur_max) and int(dur_max) != int(dur_min):
+                                        d_str += f"–{int(dur_max)}"
+                                    d_str += " min"
+
+                                with st.container(border=True):
+                                    img_url = game_info.get('lien_photo', '')
+                                    if not pd.isna(img_url) and img_url:
+                                        st.image(img_url, width=80)
+                                    st.markdown(f"**✅ {g}**")
+                                    details_parts = [x for x in [game_type, p_str, d_str] if x]
+                                    if details_parts:
+                                        st.caption(" · ".join(details_parts))
+                            else:
+                                st.markdown(f"✅ **{g}**")
+                        else:
+                            st.markdown(f"✅ **{g}**")
 
                     # Other games
                     st.markdown("### 📜 Autres jeux disponibles")
@@ -553,9 +595,15 @@ try:
                         st.error("⚠️ Veuillez remplir le nom, le bar et le jeu.")
 
     # ============================================================
-    # TAB 3: FORUM
+    # TAB 3: BIBLIOTHÈQUE
     # ============================================================
     with tab3:
+        render_game_library_tab(st.session_state.complete_games_data)
+
+    # ============================================================
+    # TAB 4: FORUM
+    # ============================================================
+    with tab4:
         st.subheader("💬 Forum")
 
         if st.session_state.role == 'guest':
@@ -729,10 +777,10 @@ try:
                 st.markdown("---")
 
     # ============================================================
-    # TAB 4: ADMIN
+    # TAB 5: ADMIN
     # ============================================================
     if st.session_state.admin_logged_in:
-        with tab4:
+        with tab5:
             st.subheader("🔧 Administration")
 
             st.markdown("### 📋 Requêtes d'ajout/modification")
