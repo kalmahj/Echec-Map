@@ -12,7 +12,7 @@ from modules.utils import find_best_image_match, get_menu_pdf_path
 from modules.auth import verify_user, create_user, get_available_icons
 
 
-def render_bar_detail_card(bar_data, bar_name, games_data, idx, key_prefix="detail"):
+def render_bar_detail_card(bar_data, bar_name, games_data, idx, key_prefix="detail", show_games=True):
     """
     Render a full bar detail card with image, info, directions, menu, and games.
     
@@ -22,6 +22,7 @@ def render_bar_detail_card(bar_data, bar_name, games_data, idx, key_prefix="deta
         games_data: DataFrame with games data
         idx: Index for unique keys
         key_prefix: Prefix for Streamlit widget keys
+        show_games: Whether to show the default games list section
     """
     # Header card
     st.markdown(f"""
@@ -84,13 +85,14 @@ def render_bar_detail_card(bar_data, bar_name, games_data, idx, key_prefix="deta
                 key=f"btn_menu_{idx}_{key_prefix}"
             )
 
-    # 5. Games List
-    st.markdown("### 🎲 Jeux Disponibles")
-    bar_games = games_data[games_data['bar_name'] == bar_name]
-    games_list = sorted(bar_games['game'].tolist()) if not bar_games.empty else []
-    with st.container(height=300):
-        for g in games_list:
-            st.markdown(f"- {g}")
+    # 5. Games List (can be skipped when caller handles games separately)
+    if show_games:
+        st.markdown("### 🎲 Jeux Disponibles")
+        bar_games = games_data[games_data['bar_name'] == bar_name]
+        games_list = sorted(bar_games['game'].tolist()) if not bar_games.empty else []
+        with st.container(height=300):
+            for g in games_list:
+                st.markdown(f"- {g}")
 
 
 def render_login_page():

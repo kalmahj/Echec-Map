@@ -241,27 +241,26 @@ def render_game_library_tab(df_games):
                     st.session_state[expand_key] = not is_expanded
                     st.rerun()
 
-        # Show expanded detail panel below the row if any card is expanded
-        for df_idx, game in row_games.iterrows():
-            expand_key = f"expand_game_{df_idx}"
-            if st.session_state.get(expand_key, False):
-                _render_detail_panel(game)
+                # Show detail panel directly under this card
+                if is_expanded:
+                    _render_detail_panel(game)
 
     # ── Pagination Controls ──────────────────────────────────
     if total_pages > 1:
         st.markdown("---")
         col_prev, col_info, col_next = st.columns([1, 2, 1])
         with col_prev:
-            if st.button("⬅️ Précédent", disabled=(page == 0), key="lib_prev"):
+            if st.button("⬅️", disabled=(page == 0), key="lib_prev", use_container_width=True):
                 st.session_state.lib_page = max(0, page - 1)
                 st.rerun()
         with col_info:
             st.markdown(
                 f"<div style='text-align:center; padding-top:0.5rem;'>"
-                f"Page <b>{page + 1}</b> / {total_pages}</div>",
+                f"<b>{page + 1}</b> / {total_pages}</div>",
                 unsafe_allow_html=True
             )
         with col_next:
-            if st.button("Suivant ➡️", disabled=(page >= total_pages - 1), key="lib_next"):
+            if st.button("➡️", disabled=(page >= total_pages - 1), key="lib_next", use_container_width=True):
                 st.session_state.lib_page = min(total_pages - 1, page + 1)
                 st.rerun()
+

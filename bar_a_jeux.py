@@ -490,70 +490,77 @@ try:
             if selected_games_multi and not map_data.empty:
                 st.markdown(f"### 📋 {len(map_data)} Bar(s) trouvé(s)")
 
-                for idx, row in map_data.iterrows():
-                    bar_name = row['Nom']
+                # Use tabs as a carousel when there are multiple bars
+                bar_names = [row['Nom'] for _, row in map_data.iterrows()]
+                if len(bar_names) > 1:
+                    bar_tabs = st.tabs([f"🍷 {name}" for name in bar_names])
+                else:
+                    bar_tabs = [st.container()]
 
-                    render_bar_detail_card(row, bar_name, st.session_state.games_data, idx, "games")
+                for tab_container, (idx, row) in zip(bar_tabs, map_data.iterrows()):
+                    with tab_container:
+                        bar_name = row['Nom']
 
-                    # Show matched games with details from complete_games_data
-                    st.markdown("### 🎲 Jeux recherchés disponibles ici")
-                    found_games = st.session_state.games_data[
-                        (st.session_state.games_data['bar_name'] == bar_name) &
-                        (st.session_state.games_data['game'].isin(selected_games_multi))
-                    ]['game'].tolist()
+                        # Show bar card WITHOUT the default games list
+                        render_bar_detail_card(row, bar_name, st.session_state.games_data, idx, "games", show_games=False)
 
-                    for g in sorted(found_games):
-                        # Try to find details from complete_games_data
-                        if not st.session_state.complete_games_data.empty:
-                            game_match = st.session_state.complete_games_data[
-                                st.session_state.complete_games_data['nom'].str.lower() == g.lower()
-                            ]
-                            if not game_match.empty:
-                                game_info = game_match.iloc[0]
-                                game_type = str(game_info.get('type', '')) if not pd.isna(game_info.get('type', '')) else ''
-                                players_min = game_info.get('nb_joueurs_min')
-                                players_max = game_info.get('nb_joueur_max')
-                                p_str = ""
-                                if not pd.isna(players_min):
-                                    p_str = f"{int(players_min)}"
-                                    if not pd.isna(players_max) and int(players_max) != int(players_min):
-                                        p_str += f"–{int(players_max)}"
-                                    p_str += " joueurs"
-                                dur_min = game_info.get('duree_min')
-                                dur_max = game_info.get('duree_max')
-                                d_str = ""
-                                if not pd.isna(dur_min):
-                                    d_str = f"{int(dur_min)}"
-                                    if not pd.isna(dur_max) and int(dur_max) != int(dur_min):
-                                        d_str += f"–{int(dur_max)}"
-                                    d_str += " min"
+                        # Show matched games with details from complete_games_data
+                        st.markdown("### 🎲 Jeux recherchés disponibles ici")
+                        found_games = st.session_state.games_data[
+                            (st.session_state.games_data['bar_name'] == bar_name) &
+                            (st.session_state.games_data['game'].isin(selected_games_multi))
+                        ]['game'].tolist()
 
-                                with st.container(border=True):
-                                    img_url = game_info.get('lien_photo', '')
-                                    if not pd.isna(img_url) and img_url:
-                                        st.image(img_url, width=80)
-                                    st.markdown(f"**✅ {g}**")
-                                    details_parts = [x for x in [game_type, p_str, d_str] if x]
-                                    if details_parts:
-                                        st.caption(" · ".join(details_parts))
+                        for g in sorted(found_games):
+                            # Try to find details from complete_games_data
+                            if not st.session_state.complete_games_data.empty:
+                                game_match = st.session_state.complete_games_data[
+                                    st.session_state.complete_games_data['nom'].str.lower() == g.lower()
+                                ]
+                                if not game_match.empty:
+                                    game_info = game_match.iloc[0]
+                                    game_type = str(game_info.get('type', '')) if not pd.isna(game_info.get('type', '')) else ''
+                                    players_min = game_info.get('nb_joueurs_min')
+                                    players_max = game_info.get('nb_joueur_max')
+                                    p_str = ""
+                                    if not pd.isna(players_min):
+                                        p_str = f"{int(players_min)}"
+                                        if not pd.isna(players_max) and int(players_max) != int(players_min):
+                                            p_str += f"–{int(players_max)}"
+                                        p_str += " joueurs"
+                                    dur_min = game_info.get('duree_min')
+                                    dur_max = game_info.get('duree_max')
+                                    d_str = ""
+                                    if not pd.isna(dur_min):
+                                        d_str = f"{int(dur_min)}"
+                                        if not pd.isna(dur_max) and int(dur_max) != int(dur_min):
+                                            d_str += f"–{int(dur_max)}"
+                                        d_str += " min"
+
+                                    with st.container(border=True):
+                                        img_url = game_info.get('lien_photo', '')
+                                        if not pd.isna(img_url) and img_url:
+                                            st.image(img_url, width=80)
+                                        st.markdown(f"**✅ {g}**")
+                                        details_parts = [x for x in [game_type, p_str, d_str] if x]
+                                        if details_parts:
+                                            st.caption(" · ".join(details_parts))
+                                else:
+                                    st.markdown(f"✅ **{g}**")
                             else:
                                 st.markdown(f"✅ **{g}**")
+
+                        # Other games
+                        st.markdown("### 📜 Autres jeux disponibles")
+                        all_bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == bar_name]['game'].tolist()
+                        other_games = [g for g in all_bar_games if g not in found_games]
+
+                        if other_games:
+                            with st.container(height=200):
+                                for g in sorted(other_games):
+                                    st.markdown(f"- {g}")
                         else:
-                            st.markdown(f"✅ **{g}**")
-
-                    # Other games
-                    st.markdown("### 📜 Autres jeux disponibles")
-                    all_bar_games = st.session_state.games_data[st.session_state.games_data['bar_name'] == bar_name]['game'].tolist()
-                    other_games = [g for g in all_bar_games if g not in found_games]
-
-                    if other_games:
-                        with st.container(height=200):
-                            for g in sorted(other_games):
-                                st.markdown(f"- {g}")
-                    else:
-                        st.info("Pas d'autres jeux disponibles.")
-
-                    st.markdown("---")
+                            st.info("Pas d'autres jeux disponibles.")
 
             elif selected_games_multi and map_data.empty:
                 st.warning("🔍 Aucun bar ne propose ces jeux. Essayez avec d'autres jeux ou faites une demande ci-dessous !")
