@@ -123,6 +123,21 @@ def _show_game_dialog():
     st.markdown("**📖 Description**")
     st.markdown(desc)
 
+    # Bars where this game is available
+    games_data = st.session_state.get('games_data')
+    if games_data is not None and not games_data.empty:
+        # Try exact match first, then fuzzy
+        matching = games_data[games_data['game'].str.lower() == name.lower()]
+        if matching.empty:
+            matching = games_data[games_data['game'].str.lower().str.contains(name.lower(), na=False)]
+        bar_names = sorted(matching['bar_name'].unique().tolist())
+        if bar_names:
+            st.markdown("---")
+            st.markdown(f"**📍 Où trouver ce jeu ? ({len(bar_names)} bar(s))**")
+            with st.container(height=180):
+                for b in bar_names:
+                    st.markdown(f"🍷 {b}")
+
 
 def render_game_library_tab(df_games):
     """Render the full Bibliothèque tab with filters and card grid."""

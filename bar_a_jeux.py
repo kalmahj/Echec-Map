@@ -238,14 +238,7 @@ try:
     with tab1:
         st.subheader("🍷 Carte des Bars")
 
-        col_help, col_reset = st.columns([3, 1])
-        with col_help:
-            st.markdown('<div class="scroll-indicator">⬇️ Résultats plus bas ⬇️</div>', unsafe_allow_html=True)
-        with col_reset:
-            if st.button("🔄 Réinitialiser la carte", use_container_width=True):
-                st.session_state['last_selected_bar'] = ""
-                st.session_state['search_bar_main'] = ""
-                st.rerun()
+        st.markdown('<div class="scroll-indicator">⬇️ Résultats plus bas ⬇️</div>', unsafe_allow_html=True)
 
         # --- Callbacks for State Management ---
         def on_arr_change():
@@ -547,9 +540,15 @@ try:
                     from modules.game_library import _render_card_html
                     for g in sorted(found_games):
                         if not st.session_state.complete_games_data.empty:
+                            # Exact match first
                             game_match = st.session_state.complete_games_data[
                                 st.session_state.complete_games_data['nom'].str.lower() == g.lower()
                             ]
+                            # Fallback: partial/contains match
+                            if game_match.empty:
+                                game_match = st.session_state.complete_games_data[
+                                    st.session_state.complete_games_data['nom'].str.lower().str.contains(g.lower(), na=False)
+                                ]
                             if not game_match.empty:
                                 game_info = game_match.iloc[0]
                                 # Render card HTML (same as Bibliothèque)
