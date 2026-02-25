@@ -837,3 +837,35 @@ iframe {
         justify-content: center;
     }
 }
+
+/* ============================================================
+   DIALOG / POPUP MODAL — Blurred backdrop
+   ============================================================ */
+
+/* Streamlit dialog overlay backdrop */
+div[data-testid="stModal"]>div:first-child {
+    background: rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+}
+
+/* Dialog box styling */
+div[data-testid="stModal"] [data-testid="stModalBody"] {
+    background: var(--color-bg-secondary) !important;
+    border-radius: var(--radius-lg) !important;
+    padding: var(--spacing-lg) !important;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2) !important;
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Board Game Library — card grid with filters and expandable detail panels.
+Board Game Library — card grid with filters and popup detail dialogs.
 """
 import math
 import streamlit as st
@@ -79,8 +79,14 @@ def _render_card_html(game, idx):
     '''
 
 
-def _render_detail_panel(game):
-    """Render the expanded detail panel using native Streamlit components."""
+@st.dialog("📖 Détails du Jeu", width="large")
+def _show_game_dialog():
+    """Render game details inside a Streamlit dialog (popup modal with blurred backdrop)."""
+    game = st.session_state.get('_dialog_game_data')
+    if game is None:
+        st.warning("Aucune donnée de jeu.")
+        return
+
     name = str(game.get('nom', 'Sans nom'))
     img_url = game.get('lien_photo', '')
     if pd.isna(img_url) or not img_url:
@@ -93,31 +99,29 @@ def _render_detail_panel(game):
     is_extension = game.get('extension', '')
     ext_label = " · Extension" if (not pd.isna(is_extension) and str(is_extension).strip()) else ""
 
-    # Use st.container with a visual border
-    with st.container(border=True):
-        # Header row: image + info
-        col_img, col_info = st.columns([1, 3])
+    # Header row: image + info
+    col_img, col_info = st.columns([1, 2])
 
-        with col_img:
-            st.image(img_url, use_container_width=True)
+    with col_img:
+        st.image(img_url, use_container_width=True)
 
-        with col_info:
-            st.markdown(f"### {name}")
-            st.caption(f"🎯 {game_type}{ext_label}")
+    with col_info:
+        st.markdown(f"### {name}")
+        st.caption(f"🎯 {game_type}{ext_label}")
 
-            # Stats row
-            stat_cols = st.columns(3)
-            with stat_cols[0]:
-                st.metric("👥 Joueurs", players)
-            with stat_cols[1]:
-                st.metric("⏱️ Durée", duration)
-            with stat_cols[2]:
-                st.metric("🎂 Âge min.", age)
+        # Stats row
+        stat_cols = st.columns(3)
+        with stat_cols[0]:
+            st.metric("👥 Joueurs", players)
+        with stat_cols[1]:
+            st.metric("⏱️ Durée", duration)
+        with stat_cols[2]:
+            st.metric("🎂 Âge min.", age)
 
-        # Description
-        st.markdown("---")
-        st.markdown(f"**📖 Description**")
-        st.markdown(desc)
+    # Description
+    st.markdown("---")
+    st.markdown("**📖 Description**")
+    st.markdown(desc)
 
 
 def render_game_library_tab(df_games):
@@ -222,6 +226,11 @@ def render_game_library_tab(df_games):
     end_idx = min(start_idx + CARDS_PER_PAGE, len(filtered))
     page_games = filtered.iloc[start_idx:end_idx]
 
+    # ── Open dialog popup if triggered ───────────────────────
+    if st.session_state.get('_open_game_dialog', False):
+        st.session_state['_open_game_dialog'] = False
+        _show_game_dialog()
+
     # ── Card Grid (render in rows of 3) ──────────────────────
     rows = [page_games.iloc[i:i+3] for i in range(0, len(page_games), 3)]
 
@@ -233,17 +242,11 @@ def render_game_library_tab(df_games):
                 card_html = _render_card_html(game, df_idx)
                 st.markdown(card_html, unsafe_allow_html=True)
 
-                # Expand button
-                expand_key = f"expand_game_{df_idx}"
-                is_expanded = st.session_state.get(expand_key, False)
-                btn_label = "✕ Fermer" if is_expanded else "🔍 Détails"
-                if st.button(btn_label, key=f"btn_{df_idx}", use_container_width=True):
-                    st.session_state[expand_key] = not is_expanded
+                # Detail button → opens popup dialog
+                if st.button("🔍 Détails", key=f"btn_{df_idx}", use_container_width=True):
+                    st.session_state['_dialog_game_data'] = game.to_dict()
+                    st.session_state['_open_game_dialog'] = True
                     st.rerun()
-
-                # Show detail panel directly under this card
-                if is_expanded:
-                    _render_detail_panel(game)
 
     # ── Pagination Controls ──────────────────────────────────
     if total_pages > 1:
@@ -263,4 +266,3 @@ def render_game_library_tab(df_games):
             if st.button("➡️", disabled=(page >= total_pages - 1), key="lib_next", use_container_width=True):
                 st.session_state.lib_page = min(total_pages - 1, page + 1)
                 st.rerun()
-
