@@ -133,7 +133,7 @@ def _show_game_dialog():
         bar_names = sorted(matching['bar_name'].unique().tolist())
         if bar_names:
             st.markdown("---")
-            st.markdown(f"**📍 Où trouver ce jeu ? ({len(bar_names)} bar(s))**")
+            st.markdown("**📍 Où trouver ce jeu ?**")
             with st.container(height=180):
                 for b in bar_names:
                     st.markdown(f"🍷 {b}")
