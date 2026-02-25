@@ -156,7 +156,7 @@ def render_game_library_tab(df_games):
     with col_players:
         player_options = ["Tous", "1", "2", "3-4", "5-6", "7+"]
         selected_players = st.selectbox(
-            "👥 Nb de joueurs",
+            "👥 Nombre de joueurs",
             player_options,
             key="lib_players_filter"
         )
@@ -164,7 +164,7 @@ def render_game_library_tab(df_games):
     with col_age:
         age_options = ["Tous", "3+", "6+", "7+", "8+", "10+", "12+", "14+"]
         selected_age = st.selectbox(
-            "🎂 Âge min.",
+            "🎂 Âge minimum",
             age_options,
             key="lib_age_filter"
         )

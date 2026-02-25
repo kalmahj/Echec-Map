@@ -848,6 +848,7 @@ iframe {
    DIALOG / POPUP MODAL — Blurred backdrop, LIGHT theme (hardcoded)
    Streamlit dialogs may not inherit :root vars, so we use
    explicit hex colors matching the app's cream/teal palette.
+   Force overrides on EVERY element to beat Streamlit's dark theme.
    ============================================================ */
 
 /* Backdrop overlay */
@@ -857,9 +858,15 @@ div[data-testid="stModal"]>div:first-child {
     -webkit-backdrop-filter: blur(10px) !important;
 }
 
-/* --- Dialog container --- */
-div[data-testid="stModal"]>div:last-child>div {
+/* --- Dialog container (catch-all) --- */
+div[data-testid="stModal"]>div:last-child>div,
+div[data-testid="stModal"]>div:last-child>div>div,
+div[data-testid="stModal"]>div:last-child>div>div>div {
     background-color: #f8f2e6 !important;
+    color: #1c1c1e !important;
+}
+
+div[data-testid="stModal"]>div:last-child>div {
     border-radius: 1rem !important;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2) !important;
     animation: modalSlideIn 0.3s ease-out;
@@ -894,7 +901,7 @@ div[data-testid="stModal"] [data-testid="stModalBody"] {
     padding: 1.5rem !important;
 }
 
-/* ALL text inside dialog */
+/* ALL text inside dialog — deep wildcard to override every child */
 div[data-testid="stModal"] p,
 div[data-testid="stModal"] h1,
 div[data-testid="stModal"] h2,
@@ -903,7 +910,8 @@ div[data-testid="stModal"] h4,
 div[data-testid="stModal"] h5,
 div[data-testid="stModal"] span,
 div[data-testid="stModal"] label,
-div[data-testid="stModal"] li {
+div[data-testid="stModal"] li,
+div[data-testid="stModal"] div {
     color: #1c1c1e !important;
 }
 
@@ -913,11 +921,13 @@ div[data-testid="stModal"] [data-testid="stCaptionContainer"] span {
 }
 
 /* Metric values */
-div[data-testid="stModal"] [data-testid="stMetricValue"] {
+div[data-testid="stModal"] [data-testid="stMetricValue"],
+div[data-testid="stModal"] [data-testid="stMetricValue"] div {
     color: #204a52 !important;
 }
 
-div[data-testid="stModal"] [data-testid="stMetricLabel"] label {
+div[data-testid="stModal"] [data-testid="stMetricLabel"] label,
+div[data-testid="stModal"] [data-testid="stMetricLabel"] div {
     color: #636366 !important;
 }
 
@@ -926,8 +936,11 @@ div[data-testid="stModal"] hr {
     border-color: #e8dcc8 !important;
 }
 
-/* Containers/cards inside dialog */
-div[data-testid="stModal"] [data-testid="stVerticalBlock"] {
+/* Containers/columns inside dialog — force transparent/light bg */
+div[data-testid="stModal"] [data-testid="stVerticalBlock"],
+div[data-testid="stModal"] [data-testid="stHorizontalBlock"],
+div[data-testid="stModal"] [data-testid="column"],
+div[data-testid="stModal"] [data-testid="stColumn"] {
     background: transparent !important;
 }
 
@@ -937,12 +950,25 @@ div[data-testid="stModal"] [data-testid="stVerticalBlockBorderWrapper"] {
 }
 
 /* Markdown blocks inside dialog */
-div[data-testid="stModal"] [data-testid="stMarkdown"] {
+div[data-testid="stModal"] [data-testid="stMarkdown"],
+div[data-testid="stModal"] [data-testid="stMarkdownContainer"] {
+    color: #1c1c1e !important;
+    background: transparent !important;
+}
+
+div[data-testid="stModal"] [data-testid="stMarkdown"] p,
+div[data-testid="stModal"] [data-testid="stMarkdownContainer"] p {
     color: #1c1c1e !important;
 }
 
-div[data-testid="stModal"] [data-testid="stMarkdown"] p {
-    color: #1c1c1e !important;
+/* Image containers inside dialog */
+div[data-testid="stModal"] [data-testid="stImage"] {
+    background: transparent !important;
+}
+
+/* Force light bg on any remaining dark containers inside modal */
+div[data-testid="stModal"] [data-testid="stElementContainer"] {
+    background: transparent !important;
 }
 
 @keyframes modalSlideIn {
