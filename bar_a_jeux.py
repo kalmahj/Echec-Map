@@ -367,7 +367,7 @@ try:
         col_map, col_details = st.columns([2, 1])
 
         with col_map:
-            m = folium.Map(location=map_center, zoom_start=map_zoom, tiles="CartoDB dark_matter", scrollWheelZoom=False)
+            m = folium.Map(location=map_center, zoom_start=map_zoom, tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", attr="Google", scrollWheelZoom=False)
             for idx, row in filtered_gdf.iterrows():
                 is_selected = (current_selection == row['Nom'])
                 icon_color = "red" if is_selected else "blue"
@@ -450,7 +450,7 @@ try:
             center_lat = map_data['lat'].mean() if len(map_data) > 0 else 48.8566
             center_lon = map_data['lon'].mean() if len(map_data) > 0 else 2.3522
 
-            m2 = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB dark_matter", scrollWheelZoom=False)
+            m2 = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", attr="Google", scrollWheelZoom=False)
 
             for idx, row in map_data.iterrows():
                 bar_games_count = len(st.session_state.games_data[st.session_state.games_data['bar_name'] == row['Nom']])
@@ -643,7 +643,7 @@ try:
         
         with col_fmap:
             f_center = [gdf_bar['lat'].mean(), gdf_bar['lon'].mean()] if not gdf_bar.empty else [48.8566, 2.3522]
-            f_map = folium.Map(location=f_center, zoom_start=12, tiles="CartoDB dark_matter", scrollWheelZoom=False)
+            f_map = folium.Map(location=f_center, zoom_start=12, tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", attr="Google", scrollWheelZoom=False)
             
             for idx, row in gdf_bar.iterrows():
                 b_name = row['Nom']
