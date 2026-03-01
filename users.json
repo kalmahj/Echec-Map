@@ -34,5 +34,11 @@
         "password": "f3029a66c61b61b41b428963a2fc134154a5383096c776f3b4064733c5463d90",
         "icon": "C:\\Users\\Pc\\Documents\\Master 2 - Cergy\\APPLICATION GESTION DE PROJET\\Echec-Map\\icone_joueurs\\icone_joueurs\\icone_7.png",
         "role": "user"
+    },
+    {
+        "username": "ningning",
+        "password": "de73f44dde756b961f4569ecb83d6e032f3c70dec8b49173a3e38364a5556e0e",
+        "icon": "C:\\Users\\Pc\\Documents\\Master 2 - Cergy\\APPLICATION GESTION DE PROJET\\Echec-Map\\icone_joueurs\\icone_joueurs\\icone_12.png",
+        "role": "user"
     }
 ]
