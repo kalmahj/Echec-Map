@@ -7,6 +7,7 @@ import ast
 import json
 import glob
 import hashlib
+import streamlit as st
 
 from modules.config import USERS_JSON_PATH, ICONS_DIR, INSULTS_PATH
 from modules.git_ops import push_changes
@@ -25,8 +26,15 @@ def load_users():
 
 def save_users(users_list):
     """Save users to JSON file and auto-commit."""
-    with open(USERS_JSON_PATH, 'w', encoding='utf-8') as f:
-        json.dump(users_list, f, indent=4, ensure_ascii=False)
+    try:
+        with open(USERS_JSON_PATH, 'w', encoding='utf-8') as f:
+            json.dump(users_list, f, indent=4, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        st.toast("💾 Utilisateurs sauvegardés", icon="✅")
+    except Exception as e:
+        st.error(f"❌ Erreur sauvegarde users.json : {e}")
+        return
 
     # Auto-commit users.json
     import subprocess
@@ -35,10 +43,13 @@ def save_users(users_list):
         subprocess.run(['git', 'config', 'user.email', 'app@echec-map.com'], cwd=repo_dir, capture_output=True)
         subprocess.run(['git', 'config', 'user.name', 'Echec Map Bot'], cwd=repo_dir, capture_output=True)
         subprocess.run(['git', 'add', 'users.json'], cwd=repo_dir, capture_output=True)
-        subprocess.run(['git', 'commit', '-m', 'Update users'], cwd=repo_dir, capture_output=True)
-        push_changes()
-    except:
-        pass
+        result = subprocess.run(['git', 'commit', '-m', 'Update users'], cwd=repo_dir, capture_output=True, text=True)
+        if result.returncode == 0:
+            push_changes()
+        elif 'nothing to commit' not in result.stdout.lower():
+            st.warning(f"⚠️ Git commit échoué : {result.stderr}")
+    except Exception as e:
+        st.warning(f"⚠️ Git auto-commit échoué : {e}")
 
 
 def hash_password(password):
@@ -47,10 +58,10 @@ def hash_password(password):
 
 
 def create_user(username, password, icon_path):
-    """Create a new user. Returns (success, message)."""
+    """Create a new user. Returns (success, message, user_data)."""
     users = load_users()
     if any(u['username'] == username for u in users):
-        return False, "Ce nom d'utilisateur existe déjà."
+        return False, "Ce nom d'utilisateur existe déjà.", None
 
     new_user = {
         'username': username,
@@ -60,7 +71,13 @@ def create_user(username, password, icon_path):
     }
     users.append(new_user)
     save_users(users)
-    return True, "Compte créé avec succès !"
+
+    # Verify the write succeeded by re-reading
+    verification = load_users()
+    if not any(u['username'] == username for u in verification):
+        return False, "⚠️ Erreur : l'utilisateur n'a pas été sauvegardé. Réessayez.", None
+
+    return True, "Compte créé avec succès !", new_user
 
 
 def verify_user(username, password):

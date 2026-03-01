@@ -212,9 +212,17 @@ onmouseout="this.style.opacity='{opacity}'; this.style.transform='scale({scale})
                 elif not new_user or not new_pass:
                     st.error("⚠️ Tous les champs sont requis.")
                 else:
-                    success, msg = create_user(new_user, new_pass, st.session_state.temp_selected_icon)
+                    success, msg, user_data = create_user(new_user, new_pass, st.session_state.temp_selected_icon)
                     if success:
-                        st.success("Compte créé avec succès ! Connectez-vous.")
+                        # Auto-login after successful registration
+                        st.session_state.logged_in = True
+                        st.session_state.username = user_data['username']
+                        st.session_state.role = user_data.get('role', 'user')
+                        st.session_state.user_icon = user_data.get('icon', '')
+                        st.session_state.show_login_form = False
+                        st.session_state.temp_selected_icon = None
+                        st.query_params["session_user"] = user_data['username']
+                        st.success("✅ Compte créé et connecté ! Bienvenue !")
                         time.sleep(1)
                         st.rerun()
                     else:

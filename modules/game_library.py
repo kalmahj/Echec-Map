@@ -134,9 +134,35 @@ def _show_game_dialog():
         if bar_names:
             st.markdown("---")
             st.markdown("**📍 Où trouver ce jeu ?**")
-            with st.container(height=180):
-                for b in bar_names:
-                    st.markdown(f"🍷 {b}")
+            for b in bar_names:
+                if st.button(f"🍷 {b}", key=f"bar_link_{name}_{b}", use_container_width=True):
+                    st.session_state['_dialog_bar_name'] = b
+                    st.session_state['_open_bar_dialog'] = True
+                    st.rerun()
+
+
+@st.dialog("🍷 Détails du Bar", width="large")
+def _show_bar_dialog():
+    """Render bar details inside a Streamlit dialog."""
+    bar_name = st.session_state.get('_dialog_bar_name')
+    if not bar_name:
+        st.warning("Aucune donnée de bar.")
+        return
+
+    from modules.data import load_data
+    from modules.components import render_bar_detail_card
+
+    try:
+        gdf_bar = load_data()
+        bar_match = gdf_bar[gdf_bar['Nom'] == bar_name]
+        if not bar_match.empty:
+            bar_data = bar_match.iloc[0]
+            games_data = st.session_state.get('games_data', pd.DataFrame())
+            render_bar_detail_card(bar_data, bar_name, games_data, 0, "lib_bar_dialog")
+        else:
+            st.warning(f"Bar '{bar_name}' introuvable.")
+    except Exception as e:
+        st.error(f"Erreur : {e}")
 
 
 def render_game_library_tab(df_games):
@@ -145,6 +171,11 @@ def render_game_library_tab(df_games):
         st.warning("Aucune donnée de jeu disponible.")
         return
 
+    # ── Open bar detail dialog if triggered ───────────────────
+    if st.session_state.get('_open_bar_dialog', False):
+        st.session_state['_open_bar_dialog'] = False
+        _show_bar_dialog()
+
     st.subheader("📚 Bibliothèque de Jeux")
     st.caption(f"{len(df_games)} jeux disponibles dans notre catalogue")
 
@@ -152,10 +183,13 @@ def render_game_library_tab(df_games):
     col_search, col_type = st.columns(2)
     col_players, col_age = st.columns(2)
 
+    all_game_names = sorted(df_games['nom'].dropna().unique().tolist())
+
     with col_search:
-        search_term = st.text_input(
+        selected_games = st.multiselect(
             "🔍 Rechercher un jeu",
-            placeholder="Tapez le nom d'un jeu…",
+            options=all_game_names,
+            placeholder="Tapez ou sélectionnez des jeux…",
             key="lib_search"
         )
 
@@ -187,8 +221,8 @@ def render_game_library_tab(df_games):
     # ── Apply Filters ────────────────────────────────────────
     filtered = df_games.copy()
 
-    if search_term:
-        filtered = filtered[filtered['nom'].str.contains(search_term, case=False, na=False)]
+    if selected_games:
+        filtered = filtered[filtered['nom'].isin(selected_games)]
 
     if selected_types:
         filtered = filtered[filtered['type'].isin(selected_types)]
