@@ -481,7 +481,7 @@ try:
                     icon=folium.Icon(color="green" if selected_games_multi else "blue", icon="gamepad", prefix="fa")
                 ).add_to(m2)
 
-            st_folium(m2, width="100%", height=500, key="folium_map_games")
+            st_folium(m2, width="100%", height=350, key="folium_map_games")
 
         with col_details2:
             if selected_games_multi and not map_data.empty:
