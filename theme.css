@@ -433,27 +433,31 @@ li[role="option"][aria-selected="true"] {
     font-size: var(--font-size-base);
 }
 
-/* Reactions */
-.reaction-container {
-    display: flex;
-    flex-direction: row;
-    gap: var(--spacing-xs);
-    flex-wrap: wrap;
-    margin-top: var(--spacing-xs);
+/* Reactions - Horizontal Social Media Layout targeting Streamlit buttons */
+.element-container:has(.reaction-row) + .element-container [data-testid="stHorizontalBlock"] {
+    gap: 0.2rem !important;
 }
 
-.reaction-btn {
-    background: none !important;
+.element-container:has(.reaction-row) + .element-container button {
+    background-color: transparent !important;
     border: none !important;
-    padding: 0 var(--spacing-xs) !important;
-    cursor: pointer;
-    font-size: var(--font-size-lg) !important;
-    line-height: 1.2;
+    font-size: 1.5rem !important;
+    padding: 0.2rem 0.5rem !important;
+    width: auto !important;
+    min-height: 0 !important;
+    box-shadow: none !important;
+    color: var(--color-text) !important;
     transition: transform 0.15s ease;
 }
 
-.reaction-btn:hover {
-    transform: scale(1.3);
+.element-container:has(.reaction-row) + .element-container button:hover {
+    transform: scale(1.3) !important;
+    background-color: transparent !important;
+    color: var(--color-accent) !important;
+}
+
+.element-container:has(.reaction-row) + .element-container button:active {
+    transform: scale(0.9) !important;
 }
 
 /* ============================================================

@@ -797,25 +797,20 @@ try:
                         else:
                             st.markdown(f"**Réactions:** {reactions}")
 
-                    st.markdown('<div class="reaction-container">', unsafe_allow_html=True)
-                    cols = st.columns([1, 1, 1, 1, 6])
-                    with cols[0]:
+                    st.markdown('<div class="reaction-row"></div>', unsafe_allow_html=True)
+                    with st.container(horizontal=True):
                         if st.button("👍", key=f"like_{idx}"):
                             add_reaction(idx, "👍")
                             st.rerun()
-                    with cols[1]:
                         if st.button("❤️", key=f"love_{idx}"):
                             add_reaction(idx, "❤️")
                             st.rerun()
-                    with cols[2]:
                         if st.button("😂", key=f"laugh_{idx}"):
                             add_reaction(idx, "😂")
                             st.rerun()
-                    with cols[3]:
                         if st.button("🎮", key=f"game_{idx}"):
                             add_reaction(idx, "🎮")
                             st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
 
                     # Comments
                     comments = post.get('comments', [])
