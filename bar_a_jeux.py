@@ -369,10 +369,10 @@ try:
                 icon_color = "red" if is_selected else "blue"
 
                 popup_html = f"""
-                <div style="font-family: 'Inter', sans-serif; min-width: 200px; background:#1C1C1E; color:#fff; padding:10px; border-radius:10px;">
-                    <h5 style="color: #007AFF; margin-bottom: 5px; font-weight:bold;">{row['Nom']}</h5>
-                    <p style="margin: 2px 0; font-size:12px; color:#ccc;"><b>📍 ADRESSE:</b><br>{row['Adresse']}</p>
-                    <p style="margin: 2px 0; font-size:12px; color:#ccc;"><b>🚇 MÉTRO:</b><br>{row.get('Métro', 'Non indiqué')}</p>
+                <div style="font-family: 'Inter', sans-serif; min-width: 200px; background:#F8F4E6; color:#333; padding:10px; border-radius:10px; border: 1px solid #E5E0D8;">
+                    <h5 style="color: #2F4F4F; margin-bottom: 5px; font-weight:bold;">{row['Nom']}</h5>
+                    <p style="margin: 2px 0; font-size:12px; color:#555;"><b>📍 ADRESSE:</b><br>{row['Adresse']}</p>
+                    <p style="margin: 2px 0; font-size:12px; color:#555;"><b>🚇 MÉTRO:</b><br>{row.get('Métro', 'Non indiqué')}</p>
                 </div>
                 """
 
@@ -463,10 +463,10 @@ try:
                     games_snippet = f"{bar_games_count} jeux"
 
                 popup_html = f"""
-                <div style="font-family: 'Inter', sans-serif; min-width: 200px; background:#1C1C1E; color:#fff; padding:10px; border-radius:10px;">
-                    <h5 style="color: #007AFF; margin-bottom: 5px; font-weight:bold;">{row['Nom']}</h5>
-                    <p style="margin: 2px 0; font-size:12px; color:#ccc;"><b>📍 ADRESSE:</b><br>{row['Adresse']}</p>
-                    <div style="margin-top:5px; font-size:12px; color:#34C759;"><b>MATCH:</b>{games_snippet}</div>
+                <div style="font-family: 'Inter', sans-serif; min-width: 200px; background:#F8F4E6; color:#333; padding:10px; border-radius:10px; border: 1px solid #E5E0D8;">
+                    <h5 style="color: #2F4F4F; margin-bottom: 5px; font-weight:bold;">{row['Nom']}</h5>
+                    <p style="margin: 2px 0; font-size:12px; color:#555;"><b>📍 ADRESSE:</b><br>{row['Adresse']}</p>
+                    <div style="margin-top:5px; font-size:12px; color:#2E8B57;"><b>MATCH:</b>{games_snippet}</div>
                 </div>
                 """
 
@@ -626,6 +626,93 @@ try:
     # ============================================================
     with tab4:
         st.subheader("💬 Forum")
+        
+        # --- Forum Map with Notifications ---
+        # Calculate active posts per bar
+        bar_post_counts = {}
+        for post in st.session_state.forum_posts:
+            b_name = post.get('bar')
+            if b_name and b_name != "N'importe quel Bar":
+                bar_post_counts[b_name] = bar_post_counts.get(b_name, 0) + 1
+        
+        col_fmap, col_fpanel = st.columns([2, 1])
+        
+        with col_fmap:
+            f_center = [gdf_bar['lat'].mean(), gdf_bar['lon'].mean()] if not gdf_bar.empty else [48.8566, 2.3522]
+            f_map = folium.Map(location=f_center, zoom_start=12, tiles="CartoDB dark_matter", scrollWheelZoom=False)
+            
+            for idx, row in gdf_bar.iterrows():
+                b_name = row['Nom']
+                post_count = bar_post_counts.get(b_name, 0)
+                
+                if post_count > 0:
+                    # Bar has active posts: sleek notification badge
+                    icon_html = f"""
+                    <div style="
+                        background-color: #FF3B30; 
+                        color: white; 
+                        border-radius: 50%; 
+                        width: 24px; 
+                        height: 24px; 
+                        display: flex; 
+                        align-items: center; 
+                        justify-content: center; 
+                        font-family: 'Inter', sans-serif; 
+                        font-weight: bold; 
+                        font-size: 12px; 
+                        box-shadow: 0 0 10px rgba(255, 59, 48, 0.6);
+                        border: 2px solid #1C1C1E;
+                    ">{post_count}</div>
+                    """
+                    icon = folium.DivIcon(html=icon_html, icon_size=(24, 24), icon_anchor=(12, 12))
+                else:
+                    # Standard marker
+                    icon = folium.Icon(color="gray", icon="comment", prefix="fa")
+                
+                popup_html = f"""
+                <div style="font-family: 'Inter', sans-serif; min-width: 150px; background:#F8F4E6; color:#333; padding:10px; border-radius:10px; border: 1px solid #E5E0D8;">
+                    <h5 style="color: #2F4F4F; margin-bottom: 5px; font-weight:bold;">{b_name}</h5>
+                    <p style="margin: 2px 0; font-size:12px; color:#555;">{post_count} post(s) actif(s)</p>
+                </div>
+                """
+                
+                folium.Marker(
+                    [row['lat'], row['lon']],
+                    tooltip=b_name,
+                    popup=folium.Popup(popup_html, max_width=300),
+                    icon=icon
+                ).add_to(f_map)
+                
+            f_map_data = st_folium(f_map, width="100%", height=350, key="forum_map")
+            
+            # Detect map click
+            if f_map_data and f_map_data.get("last_object_clicked_tooltip"):
+                clicked_bar = f_map_data["last_object_clicked_tooltip"]
+                if clicked_bar in bar_post_counts:
+                    st.session_state["forum_selected_bar"] = clicked_bar
+        
+        with col_fpanel:
+            st.markdown("#### 📣 Notifications")
+            sel_fbar = st.session_state.get("forum_selected_bar")
+            if sel_fbar and sel_fbar in bar_post_counts:
+                st.markdown(f"**{sel_fbar}**")
+                # Find posts for this bar
+                bar_posts = [(i, p) for i, p in enumerate(st.session_state.forum_posts) if p.get('bar') == sel_fbar]
+                
+                with st.container(height=300):
+                    for p_idx, p in bar_posts:
+                        st.markdown(f"""
+                        <div style="background:#FAF8F2; padding:12px; border-radius:8px; margin-bottom:12px; border-left: 4px solid #D35400; border: 1px solid #EAEADF; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                            <div style="font-size: 0.8em; color: #7F8C8D;">{p['username']} • {p['timestamp']}</div>
+                            <div style="font-weight: bold; margin: 4px 0; color: #2C3E50;">🎮 {p['game']}</div>
+                            <div style="font-size: 0.9em; margin-bottom: 8px; color: #34495E;">{p['message'][:50]}{'...' if len(p['message'])>50 else ''}</div>
+                            <a href="#post-{p_idx}" style="color: #C0392B; text-decoration: none; font-size: 0.85em; font-weight: 600;">🔗 Voir le post</a>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("Cliquez sur un badge rouge sur la carte pour voir les posts liés à ce bar.")
+
+        st.markdown("---")
 
         if st.session_state.role == 'guest':
             st.info("🔒 Connectez-vous pour publier un message.")
@@ -672,6 +759,9 @@ try:
                 is_admin = st.session_state.get('role') == 'admin'
                 col1, col2 = st.columns([4, 1])
                 with col1:
+                    # Anchor for scrolling
+                    st.markdown(f"<div id='post-{idx}'></div>", unsafe_allow_html=True)
+                    
                     reported_flag = "🚩 " if post.get('reported', False) else ""
 
                     col_p_icon, col_p_info = st.columns([1, 8])
