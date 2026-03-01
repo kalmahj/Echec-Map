@@ -34,6 +34,10 @@ from modules.forum import (
     approve_game_request, reject_game_request
 )
 from modules.components import render_bar_detail_card, render_login_page
+
+import importlib
+import modules.game_library
+importlib.reload(modules.game_library)
 from modules.game_library import render_game_library_tab
 
 # ============================================================
@@ -383,7 +387,7 @@ try:
                     icon=folium.Icon(color=icon_color, icon="glass-cheers", prefix="fa")
                 ).add_to(m)
 
-            map_data = st_folium(m, width="100%", height=600, key="main_map")
+            map_data = st_folium(m, width="100%", height=350, key="main_map")
 
             # --- Detect Map Click ---
             if map_data and map_data.get("last_object_clicked_tooltip"):
