@@ -262,7 +262,7 @@ label,
     /* Fond clair (White) */
     color: #000000 !important;
     /* Texte foncé (Black) */
-    caret-color: #000000 !important;
+    caret-color: #ece8e8 !important;
     border: 2px solid var(--color-accent) !important;
     /* Contour foncé (Teal Accent) */
     border-radius: var(--radius-md) !important;
